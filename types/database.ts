@@ -1,0 +1,180 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
+export interface Database {
+  public: {
+    Tables: {
+      users: {
+        Row: {
+          id: string;
+          handle: string;
+          display_name: string;
+          bio: string;
+          avatar_url: string | null;
+          expo_push_token: string | null;
+          is_online: boolean;
+          last_seen_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          handle: string;
+          display_name?: string;
+          bio?: string;
+          avatar_url?: string | null;
+          expo_push_token?: string | null;
+          is_online?: boolean;
+          last_seen_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          handle?: string;
+          display_name?: string;
+          bio?: string;
+          avatar_url?: string | null;
+          expo_push_token?: string | null;
+          is_online?: boolean;
+          last_seen_at?: string;
+          updated_at?: string;
+        };
+      };
+      conversations: {
+        Row: {
+          id: string;
+          participant_1_id: string;
+          participant_2_id: string;
+          last_message_id: string | null;
+          last_message_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          participant_1_id: string;
+          participant_2_id: string;
+          last_message_id?: string | null;
+          last_message_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          last_message_id?: string | null;
+          last_message_at?: string;
+        };
+      };
+      messages: {
+        Row: {
+          id: string;
+          conversation_id: string;
+          sender_id: string;
+          message_type: 'text' | 'image' | 'sticker';
+          content: string | null;
+          image_url: string | null;
+          image_width: number | null;
+          image_height: number | null;
+          read_at: string | null;
+          is_deleted: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          conversation_id: string;
+          sender_id: string;
+          message_type?: 'text' | 'image' | 'sticker';
+          content?: string | null;
+          image_url?: string | null;
+          image_width?: number | null;
+          image_height?: number | null;
+          read_at?: string | null;
+          is_deleted?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          content?: string | null;
+          image_url?: string | null;
+          image_width?: number | null;
+          image_height?: number | null;
+          read_at?: string | null;
+          is_deleted?: boolean;
+        };
+      };
+      friendships: {
+        Row: {
+          id: string;
+          requester_id: string;
+          addressee_id: string;
+          status: 'pending' | 'accepted' | 'rejected';
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          requester_id: string;
+          addressee_id: string;
+          status?: 'pending' | 'accepted' | 'rejected';
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          status?: 'pending' | 'accepted' | 'rejected';
+          updated_at?: string;
+        };
+      };
+      blocked_users: {
+        Row: {
+          id: string;
+          blocker_id: string;
+          blocked_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          blocker_id: string;
+          blocked_id: string;
+          created_at?: string;
+        };
+        Update: Record<string, never>;
+      };
+      typing_indicators: {
+        Row: {
+          conversation_id: string;
+          user_id: string;
+          is_typing: boolean;
+          updated_at: string;
+        };
+        Insert: {
+          conversation_id: string;
+          user_id: string;
+          is_typing?: boolean;
+          updated_at?: string;
+        };
+        Update: {
+          is_typing?: boolean;
+          updated_at?: string;
+        };
+      };
+    };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
+  };
+}
+
+export type UserProfile = Database['public']['Tables']['users']['Row'];
+export type Conversation = Database['public']['Tables']['conversations']['Row'];
+export type Message = Database['public']['Tables']['messages']['Row'];
+export type Friendship = Database['public']['Tables']['friendships']['Row'];
+
+export type ConversationWithUser = Conversation & {
+  other_user: UserProfile;
+  last_message?: Message | null;
+};
+
+export type MessageWithSender = Message & {
+  sender: UserProfile;
+};
