@@ -17,6 +17,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { ConversationWithUser } from '@/types/database';
 import { ConversationItem } from '@/components/ConversationItem';
 import { Colors } from '@/lib/colors';
+import { useColors } from '@/lib/theme';
 
 const MESSAGE_PREVIEW_KEY = 'message_preview_enabled';
 
@@ -104,6 +105,7 @@ const skeletonStyles = StyleSheet.create({
 
 export default function ChatsScreen() {
   const { session } = useAuthStore();
+  const C = useColors();
   const [conversations, setConversations] = useState<ConversationWithUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -180,9 +182,6 @@ export default function ChatsScreen() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchConversations, session]);
 
-  // After the initial load, jump directly to the most recent conversation.
-  // hasAutoNavigated ensures this only runs once per session so the user
-  // can freely return to the list without being redirected again.
   useEffect(() => {
     if (!loading && conversations.length > 0 && !hasAutoNavigated.current) {
       hasAutoNavigated.current = true;
@@ -199,7 +198,7 @@ export default function ChatsScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>NEXUM</Text>
+          <Text style={[styles.headerTitle, { color: C.primary }]}>NEXUM</Text>
         </View>
         <ChatListSkeleton />
       </SafeAreaView>
@@ -209,12 +208,12 @@ export default function ChatsScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>NEXUM</Text>
+        <Text style={[styles.headerTitle, { color: C.primary }]}>NEXUM</Text>
         <TouchableOpacity
           style={styles.headerBtn}
           onPress={() => router.push('/chat/new')}
         >
-          <Edit3 size={22} color={Colors.primary} />
+          <Edit3 size={22} color={C.primary} />
         </TouchableOpacity>
       </View>
 
@@ -223,7 +222,7 @@ export default function ChatsScreen() {
           <Text style={styles.emptyTitle}>まだチャットがありません</Text>
           <Text style={styles.emptySubtitle}>フレンドを追加してチャットを始めましょう</Text>
           <TouchableOpacity
-            style={styles.startBtn}
+            style={[styles.startBtn, { backgroundColor: C.primary }]}
             onPress={() => router.push('/friend/search')}
           >
             <Text style={styles.startBtnText}>フレンドを探す</Text>
@@ -245,7 +244,7 @@ export default function ChatsScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={Colors.primary}
+              tintColor={C.primary}
             />
           }
         />
@@ -269,7 +268,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: '800',
-    color: Colors.primary,
     letterSpacing: 2,
   },
   headerBtn: {
@@ -286,7 +284,6 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center' },
   emptySubtitle: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
   startBtn: {
-    backgroundColor: Colors.primary,
     borderRadius: 12,
     paddingHorizontal: 24,
     paddingVertical: 12,

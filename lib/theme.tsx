@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Colors } from '@/lib/colors';
 
 const THEME_COLOR_KEY = 'theme_color';
 const DEFAULT_COLOR = '#0D47A1';
@@ -16,6 +17,20 @@ export const ThemeContext = createContext<ThemeContextType>({
 
 export function useTheme() {
   return useContext(ThemeContext);
+}
+
+export function useColors() {
+  const { primaryColor } = useTheme();
+  const isLight = primaryColor === '#EEEEEE' || primaryColor === '#F9A825';
+  return {
+    ...Colors,
+    primary: primaryColor,
+    secondary: primaryColor,
+    accent: primaryColor,
+    surface: primaryColor + '1A',
+    border: primaryColor + '44',
+    textOnPrimary: isLight ? '#212121' : '#FFFFFF',
+  };
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {

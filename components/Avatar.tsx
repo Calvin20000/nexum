@@ -7,6 +7,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { Colors } from '@/lib/colors';
+import { useColors } from '@/lib/theme';
 
 interface AvatarProps {
   uri?: string | null;
@@ -23,6 +24,7 @@ export function Avatar({
   online = false,
   style,
 }: AvatarProps) {
+  const C = useColors();
   const initials = name
     .split(' ')
     .map((w) => w[0])
@@ -49,10 +51,10 @@ export function Avatar({
           <View
             style={[
               styles.fallback,
-              { width: size, height: size, borderRadius: size / 2 },
+              { width: size, height: size, borderRadius: size / 2, backgroundColor: C.primary },
             ]}
           >
-            <Text style={[styles.initials, { fontSize }]}>{initials || '?'}</Text>
+            <Text style={[styles.initials, { fontSize, color: C.textOnPrimary }]}>{initials || '?'}</Text>
           </View>
         )}
       </View>
@@ -82,12 +84,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   fallback: {
-    backgroundColor: Colors.secondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   initials: {
-    color: Colors.white,
     fontWeight: '600',
   },
   onlineDot: {

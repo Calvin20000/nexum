@@ -33,13 +33,19 @@ function formatTime(iso: string): string {
 }
 
 export function QuotedMessage({ message, senderName }: { message: Message; senderName?: string }) {
-  const text = message.message_type === 'image' ? '📷 画像' : (message.content ?? '');
+  const isImage = message.message_type === 'image' && message.image_url;
+  const text = isImage ? '写真' : (message.content ?? '');
   return (
     <View style={quoteStyles.container}>
       <View style={quoteStyles.bar} />
       <View style={quoteStyles.content}>
         {senderName ? <Text style={quoteStyles.name}>{senderName}</Text> : null}
-        <Text style={quoteStyles.text} numberOfLines={2}>{text}</Text>
+        <View style={quoteStyles.row}>
+          {isImage && (
+            <Image source={{ uri: message.image_url! }} style={quoteStyles.thumb} />
+          )}
+          <Text style={quoteStyles.text} numberOfLines={2}>{text}</Text>
+        </View>
       </View>
     </View>
   );
@@ -57,7 +63,9 @@ const quoteStyles = StyleSheet.create({
   bar: { width: 3, backgroundColor: '#1976D2', borderRadius: 2 },
   content: { flex: 1 },
   name: { fontSize: 11, fontWeight: '700', color: '#1976D2', marginBottom: 2 },
-  text: { fontSize: 12, color: '#757575' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  thumb: { width: 36, height: 36, borderRadius: 4, backgroundColor: '#E0E0E0' },
+  text: { fontSize: 12, color: '#757575', flex: 1 },
 });
 
 export function MessageBubble({

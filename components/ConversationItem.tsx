@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Avatar } from './Avatar';
 import { ConversationWithUser } from '@/types/database';
 import { Colors } from '@/lib/colors';
+import { useColors } from '@/lib/theme';
 
 interface ConversationItemProps {
   item: ConversationWithUser;
@@ -23,6 +24,7 @@ function formatRelativeTime(iso: string): string {
 }
 
 export function ConversationItem({ item, onPress, previewEnabled = true }: ConversationItemProps) {
+  const C = useColors();
   const lastMsg = item.last_message;
   const user = item.other_user;
   const isUnread = lastMsg && !lastMsg.read_at && lastMsg.sender_id !== user.id;
@@ -59,12 +61,12 @@ export function ConversationItem({ item, onPress, previewEnabled = true }: Conve
         </View>
         <View style={styles.bottomRow}>
           <Text
-            style={[styles.preview, isUnread && styles.previewUnread]}
+            style={[styles.preview, isUnread && { color: C.primary, fontWeight: '600' }]}
             numberOfLines={1}
           >
             {previewText || 'チャットを開始しましょう'}
           </Text>
-          {isUnread && <View style={styles.unreadDot} />}
+          {isUnread && <View style={[styles.unreadDot, { backgroundColor: C.primary }]} />}
         </View>
       </View>
     </TouchableOpacity>
@@ -110,15 +112,10 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     flex: 1,
   },
-  previewUnread: {
-    color: Colors.primary,
-    fontWeight: '600',
-  },
   unreadDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: Colors.accent,
     marginLeft: 8,
   },
 });

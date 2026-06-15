@@ -16,11 +16,13 @@ import { useAuthStore } from '@/stores/authStore';
 import { UserProfile, Friendship } from '@/types/database';
 import { Avatar } from '@/components/Avatar';
 import { Colors } from '@/lib/colors';
+import { useColors } from '@/lib/theme';
 
 type SearchResult = UserProfile & { friendshipStatus?: 'pending' | 'accepted' | 'rejected' | 'self' };
 
 export default function FriendSearchScreen() {
   const { session } = useAuthStore();
+  const C = useColors();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -104,12 +106,12 @@ export default function FriendSearchScreen() {
           <Text style={styles.statusText}>フレンド</Text>
         </View>
       ) : item.friendshipStatus === 'pending' ? (
-        <View style={[styles.statusBadge, { backgroundColor: Colors.surface }]}>
-          <Text style={[styles.statusText, { color: Colors.secondary }]}>申請済</Text>
+        <View style={[styles.statusBadge, { backgroundColor: C.surface }]}>
+          <Text style={[styles.statusText, { color: C.primary }]}>申請済</Text>
         </View>
       ) : item.friendshipStatus !== 'self' ? (
         <TouchableOpacity
-          style={styles.addBtn}
+          style={[styles.addBtn, { backgroundColor: C.primary }]}
           onPress={() => sendRequest(item.id)}
           disabled={sendingTo === item.id}
         >
@@ -125,7 +127,7 @@ export default function FriendSearchScreen() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <ChevronLeft size={24} color={Colors.primary} />
+          <ChevronLeft size={24} color={C.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>ユーザーを検索</Text>
         <View style={styles.headerRight} />
@@ -145,7 +147,7 @@ export default function FriendSearchScreen() {
           autoFocus
         />
         <TouchableOpacity
-          style={[styles.searchBtn, !query.trim() && styles.searchBtnDisabled]}
+          style={[styles.searchBtn, { backgroundColor: C.primary }, !query.trim() && styles.searchBtnDisabled]}
           onPress={search}
           disabled={!query.trim()}
         >
@@ -155,7 +157,7 @@ export default function FriendSearchScreen() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator color={Colors.primary} />
+          <ActivityIndicator color={C.primary} />
         </View>
       ) : searched && results.length === 0 ? (
         <View style={styles.center}>
@@ -203,7 +205,6 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 15, color: Colors.textPrimary },
   searchBtn: {
-    backgroundColor: Colors.primary,
     borderRadius: 9,
     paddingHorizontal: 14,
     paddingVertical: 7,
@@ -240,7 +241,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: Colors.primary,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 7,

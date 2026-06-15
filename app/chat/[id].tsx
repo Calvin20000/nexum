@@ -31,6 +31,7 @@ import { EmojiPicker } from '@/components/EmojiPicker';
 import { StickerPicker, Sticker as StickerType } from '@/components/StickerPicker';
 import { Avatar } from '@/components/Avatar';
 import { Colors } from '@/lib/colors';
+import { useColors } from '@/lib/theme';
 import { SOUND_ENABLED_KEY } from '@/app/(tabs)/settings';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -48,6 +49,7 @@ interface PendingImage {
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuthStore();
+  const C = useColors();
   const [messages, setMessages] = useState<Message[]>([]);
   const [senderMap, setSenderMap] = useState<Record<string, UserProfile>>({});
   const [otherUser, setOtherUser] = useState<UserProfile | null>(null);
@@ -745,7 +747,7 @@ export default function ChatScreen() {
       <View style={[styles.rootWrapper, webStyle]}>
         <SafeAreaView style={styles.safe}>
           <View style={styles.center}>
-            <ActivityIndicator size="large" color={Colors.primary} />
+            <ActivityIndicator size="large" color={C.primary} />
           </View>
         </SafeAreaView>
       </View>
@@ -757,7 +759,7 @@ export default function ChatScreen() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <ChevronLeft size={26} color={Colors.primary} />
+            <ChevronLeft size={26} color={C.primary} />
           </TouchableOpacity>
           {otherUser && (
             <TouchableOpacity
@@ -802,7 +804,7 @@ export default function ChatScreen() {
             onEndReachedThreshold={0.3}
             ListFooterComponent={
               isLoadingMore
-                ? <ActivityIndicator size="small" color={Colors.primary} style={styles.loadMoreSpinner} />
+                ? <ActivityIndicator size="small" color={C.primary} />
                 : null
             }
             ListEmptyComponent={
@@ -839,14 +841,14 @@ export default function ChatScreen() {
               style={[styles.toolBtn, panel === 'sticker' && styles.toolBtnActive]}
               onPress={() => openPanel('sticker')}
             >
-              <Sticker size={22} color={panel === 'sticker' ? Colors.primary : Colors.textMuted} />
+              <Sticker size={22} color={panel === 'sticker' ? C.primary : Colors.textMuted} />
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.toolBtn, panel === 'emoji' && styles.toolBtnActive]}
               onPress={() => openPanel('emoji')}
             >
-              <Smile size={22} color={panel === 'emoji' ? Colors.primary : Colors.textMuted} />
+              <Smile size={22} color={panel === 'emoji' ? C.primary : Colors.textMuted} />
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.toolBtn} onPress={handleImageButtonPress}>
@@ -885,17 +887,24 @@ export default function ChatScreen() {
           {panel === 'sticker' && <StickerPicker onSelect={handleStickerSelect} />}
 
           {replyTo && (
-            <View style={styles.replyBar}>
-              <View style={styles.replyBarLine} />
+            <View style={[styles.replyBar, { backgroundColor: C.surface, borderTopColor: C.border }]}>
+              <View style={[styles.replyBarLine, { backgroundColor: C.primary }]} />
               <View style={styles.replyBarContent}>
-                <Text style={styles.replyBarName}>
+                <Text style={[styles.replyBarName, { color: C.primary }]}>
                   {senderMap[replyTo.sender_id]?.display_name ||
                     senderMap[replyTo.sender_id]?.handle ||
                     '返信先'}
                 </Text>
-                <Text style={styles.replyBarText} numberOfLines={1}>
-                  {replyTo.message_type === 'image' ? '📷 画像' : replyTo.content}
-                </Text>
+                {replyTo.message_type === 'image' && replyTo.image_url ? (
+                  <View style={styles.replyBarImageRow}>
+                    <Image source={{ uri: replyTo.image_url }} style={styles.replyBarThumb} />
+                    <Text style={styles.replyBarText} numberOfLines={1}>写真</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.replyBarText} numberOfLines={1}>
+                    {replyTo.message_type === 'sticker' ? replyTo.content : replyTo.content}
+                  </Text>
+                )}
               </View>
               <TouchableOpacity onPress={() => setReplyTo(null)} style={styles.replyBarCancel}>
                 <X size={18} color={Colors.textMuted} />
@@ -920,11 +929,11 @@ export default function ChatScreen() {
           <View style={styles.sheetContainer}>
             <Text style={styles.sheetTitle}>写真を送信</Text>
             <TouchableOpacity style={styles.sheetOption} onPress={handlePickFromCamera}>
-              <Camera size={22} color={Colors.primary} />
+              <Camera size={22} color={C.primary} />
               <Text style={styles.sheetOptionText}>カメラで撮影</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.sheetOption} onPress={handlePickFromLibrary}>
-              <ImageIcon size={22} color={Colors.primary} />
+              <ImageIcon size={22} color={C.primary} />
               <Text style={styles.sheetOptionText}>ライブラリから選択</Text>
             </TouchableOpacity>
             <View style={styles.sheetDivider} />
@@ -959,7 +968,7 @@ export default function ChatScreen() {
               )}
               {sendingImage && (
                 <View style={styles.uploadingRow}>
-                  <ActivityIndicator size="small" color={Colors.primary} />
+                  <ActivityIndicator size="small" color={C.primary} />
                   <Text style={styles.uploadingText}>アップロード中...</Text>
                 </View>
               )}
@@ -1405,21 +1414,20 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
 
-  // Reply bar
   replyBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E3F2FD',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderTopWidth: 1,
-    borderTopColor: '#BBDEFB',
     gap: 8,
   },
-  replyBarLine: { width: 3, height: 36, backgroundColor: '#1976D2', borderRadius: 2 },
+  replyBarLine: { width: 3, height: 36, borderRadius: 2 },
   replyBarContent: { flex: 1 },
-  replyBarName: { fontSize: 12, fontWeight: '700', color: '#1976D2', marginBottom: 2 },
+  replyBarName: { fontSize: 12, fontWeight: '700', marginBottom: 2 },
   replyBarText: { fontSize: 12, color: Colors.textSecondary },
+  replyBarImageRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  replyBarThumb: { width: 32, height: 32, borderRadius: 4, backgroundColor: Colors.border },
   replyBarCancel: { padding: 4 },
 
   // Action menu

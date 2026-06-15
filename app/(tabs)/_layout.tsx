@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Tabs } from 'expo-router';
 import { MessageCircle, Users, User, Settings } from 'lucide-react-native';
 import { Colors } from '@/lib/colors';
+import { useColors } from '@/lib/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
@@ -52,17 +53,18 @@ export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const tabBarHeight = 56 + insets.bottom;
   const unreadCount = useUnreadCount();
+  const C = useColors();
 
   return (
     <Tabs
       initialRouteName="friends"
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: Colors.primary,
+        tabBarActiveTintColor: C.primary,
         tabBarInactiveTintColor: Colors.textMuted,
         tabBarStyle: {
           backgroundColor: Colors.white,
-          borderTopColor: Colors.border,
+          borderTopColor: Colors.separator,
           borderTopWidth: 1,
           height: tabBarHeight,
           paddingBottom: insets.bottom + 4,
@@ -92,7 +94,7 @@ export default function TabsLayout() {
           title: 'チャット',
           tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : undefined,
           tabBarBadgeStyle: {
-            backgroundColor: '#1976D2',
+            backgroundColor: C.primary,
             fontSize: 11,
             fontWeight: '700',
             minWidth: 18,

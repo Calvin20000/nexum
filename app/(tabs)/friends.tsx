@@ -20,6 +20,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { Friendship, UserProfile } from '@/types/database';
 import { Avatar } from '@/components/Avatar';
 import { Colors } from '@/lib/colors';
+import { useColors } from '@/lib/theme';
 
 function useSkeletonPulse() {
   const anim = useRef(new Animated.Value(0.4)).current;
@@ -85,6 +86,7 @@ interface FriendGroup {
 
 export default function FriendsScreen() {
   const { session } = useAuthStore();
+  const C = useColors();
   const [friends, setFriends] = useState<FriendWithUser[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -221,16 +223,16 @@ export default function FriendsScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>フレンド</Text>
+        <Text style={[styles.headerTitle, { color: C.primary }]}>フレンド</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/friend/requests')}>
-            <Bell size={20} color={Colors.primary} />
+            <Bell size={20} color={C.primary} />
             {pendingCount > 0 && (
               <View style={styles.badge}><Text style={styles.badgeText}>{pendingCount}</Text></View>
             )}
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/friend/search')}>
-            <UserPlus size={20} color={Colors.primary} />
+            <UserPlus size={20} color={C.primary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -243,17 +245,20 @@ export default function FriendsScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => { setRefreshing(true); fetchFriends(); fetchGroups(); }}
-              tintColor={Colors.primary}
+              tintColor={C.primary}
             />
           }
         >
           {/* グループセクション */}
           <View style={styles.sectionHeader}>
             <View style={styles.sectionLeft}>
-              <Users size={14} color={Colors.primary} />
+              <Users size={14} color={C.primary} />
               <Text style={styles.sectionLabel}>グループ</Text>
             </View>
-            <TouchableOpacity style={styles.createGroupBtn} onPress={() => setShowCreateGroup(true)}>
+            <TouchableOpacity
+              style={[styles.createGroupBtn, { backgroundColor: C.primary }]}
+              onPress={() => setShowCreateGroup(true)}
+            >
               <Plus size={13} color={Colors.white} />
               <Text style={styles.createGroupText}>作成</Text>
             </TouchableOpacity>
@@ -266,7 +271,7 @@ export default function FriendsScreen() {
           ) : (
             groups.map((group) => (
               <TouchableOpacity key={group.id} style={styles.groupItem} onPress={() => setSelectedGroup(group)} activeOpacity={0.7}>
-                <View style={styles.groupIcon}><Users size={18} color={Colors.primary} /></View>
+                <View style={styles.groupIcon}><Users size={18} color={C.primary} /></View>
                 <View style={styles.groupInfo}>
                   <Text style={styles.groupName}>{group.name}</Text>
                   <Text style={styles.groupMemberCount}>{group.members?.length ?? 0}人のメンバー</Text>
@@ -289,7 +294,10 @@ export default function FriendsScreen() {
             <View style={styles.empty}>
               <Text style={styles.emptyTitle}>フレンドがいません</Text>
               <Text style={styles.emptySubtitle}>@IDで友達を検索して申請しましょう</Text>
-              <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/friend/search')}>
+              <TouchableOpacity
+                style={[styles.addBtn, { backgroundColor: C.primary }]}
+                onPress={() => router.push('/friend/search')}
+              >
                 <Text style={styles.addBtnText}>フレンドを追加</Text>
               </TouchableOpacity>
             </View>
@@ -317,8 +325,8 @@ export default function FriendsScreen() {
                     </View>
                   </View>
                   {startingId === item.friend.id
-                    ? <ActivityIndicator size="small" color={Colors.primary} />
-                    : <View style={styles.chatBtn}><MessageCircle size={20} color={Colors.primary} /></View>}
+                    ? <ActivityIndicator size="small" color={C.primary} />
+                    : <View style={styles.chatBtn}><MessageCircle size={20} color={C.primary} /></View>}
                 </TouchableOpacity>
                 {index < friends.length - 1 && <View style={styles.separator} />}
               </View>
@@ -352,23 +360,27 @@ export default function FriendsScreen() {
                 return (
                   <TouchableOpacity
                     key={item.id}
-                    style={[styles.friendSelectItem, selected && styles.friendSelectItemActive]}
+                    style={[styles.friendSelectItem, selected && { backgroundColor: C.surface }]}
                     onPress={() => setSelectedFriendIds((p) =>
                       p.includes(item.friend.id) ? p.filter((x) => x !== item.friend.id) : [...p, item.friend.id]
                     )}
                     activeOpacity={0.7}
                   >
                     <Avatar uri={item.friend.avatar_url} name={item.friend.display_name || item.friend.handle} size={40} />
-                    <Text style={[styles.friendSelectName, selected && styles.friendSelectNameActive]}>
+                    <Text style={[styles.friendSelectName, selected && { color: C.primary, fontWeight: '600' }]}>
                       {item.friend.display_name || item.friend.handle}
                     </Text>
-                    {selected && <View style={styles.checkMark}><Text style={styles.checkMarkText}>✓</Text></View>}
+                    {selected && (
+                      <View style={[styles.checkMark, { backgroundColor: C.primary }]}>
+                        <Text style={styles.checkMarkText}>✓</Text>
+                      </View>
+                    )}
                   </TouchableOpacity>
                 );
               })}
             </ScrollView>
             <TouchableOpacity
-              style={[styles.createBtn, (!groupName.trim() || creatingGroup) && styles.createBtnDisabled]}
+              style={[styles.createBtn, { backgroundColor: C.primary }, (!groupName.trim() || creatingGroup) && styles.createBtnDisabled]}
               onPress={createGroup}
               disabled={!groupName.trim() || creatingGroup}
             >
@@ -428,7 +440,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20, paddingVertical: 16,
     backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.separator,
   },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: Colors.primary },
+  headerTitle: { fontSize: 22, fontWeight: '800' },
   headerActions: { flexDirection: 'row', gap: 8 },
   headerBtn: {
     width: 40, height: 40, alignItems: 'center', justifyContent: 'center',
@@ -448,7 +460,7 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 12, fontWeight: '700', color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 1 },
   createGroupBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: Colors.primary, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5,
   },
   createGroupText: { color: Colors.white, fontSize: 12, fontWeight: '600' },
   groupEmpty: { paddingVertical: 14, paddingHorizontal: 16, backgroundColor: Colors.white },
@@ -465,7 +477,7 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', gap: 12, paddingHorizontal: 40, paddingVertical: 40 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center' },
   emptySubtitle: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
-  addBtn: { backgroundColor: Colors.primary, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8 },
+  addBtn: { borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8 },
   addBtnText: { color: Colors.white, fontWeight: '600', fontSize: 15 },
   friendItem: {
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12,
@@ -491,12 +503,10 @@ const styles = StyleSheet.create({
   selectFriendsLabel: { fontSize: 12, fontWeight: '700', color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
   friendSelectList: { maxHeight: 200, marginBottom: 16 },
   friendSelectItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 8, borderRadius: 12, gap: 12, marginBottom: 2 },
-  friendSelectItemActive: { backgroundColor: '#E3F2FD' },
   friendSelectName: { flex: 1, fontSize: 15, color: Colors.textPrimary, fontWeight: '500' },
-  friendSelectNameActive: { color: Colors.primary, fontWeight: '600' },
-  checkMark: { width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
+  checkMark: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   checkMarkText: { color: Colors.white, fontSize: 13, fontWeight: '700' },
-  createBtn: { backgroundColor: Colors.primary, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
+  createBtn: { borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
   createBtnDisabled: { opacity: 0.5 },
   createBtnText: { color: Colors.white, fontSize: 15, fontWeight: '700' },
   memberItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12 },
