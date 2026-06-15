@@ -8,15 +8,18 @@ import {
   Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, Lock, Info, ChevronRight, LogOut, Volume2 } from 'lucide-react-native';
+import { Bell, Lock, Info, ChevronRight, LogOut, Volume2, MessageSquare, Palette } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '@/lib/colors';
 import { useAuthStore } from '@/stores/authStore';
+import { useTheme, THEME_COLORS } from '@/lib/theme';
 
 export const SOUND_ENABLED_KEY = 'sound_enabled';
+export const MESSAGE_PREVIEW_KEY = 'message_preview_enabled';
 
 export default function SettingsScreen() {
   const { profile, signOut } = useAuthStore();
+  const { primaryColor, setPrimaryColor } = useTheme();
   const [notifications, setNotifications] = React.useState(true);
   const [messagePreview, setMessagePreview] = React.useState(true);
   const [soundEnabled, setSoundEnabled] = React.useState(true);
@@ -25,11 +28,19 @@ export default function SettingsScreen() {
     AsyncStorage.getItem(SOUND_ENABLED_KEY).then((val) => {
       if (val !== null) setSoundEnabled(val === 'true');
     });
+    AsyncStorage.getItem(MESSAGE_PREVIEW_KEY).then((val) => {
+      if (val !== null) setMessagePreview(val !== 'false');
+    });
   }, []);
 
   const handleSoundToggle = async (value: boolean) => {
     setSoundEnabled(value);
     await AsyncStorage.setItem(SOUND_ENABLED_KEY, value ? 'true' : 'false');
+  };
+
+  const handleMessagePreviewToggle = async (value: boolean) => {
+    setMessagePreview(value);
+    await AsyncStorage.setItem(MESSAGE_PREVIEW_KEY, value ? 'true' : 'false');
   };
 
   return (
@@ -44,14 +55,14 @@ export default function SettingsScreen() {
           <View style={styles.row}>
             <View style={styles.rowLeft}>
               <View style={[styles.iconBox, { backgroundColor: '#E3F2FD' }]}>
-                <Bell size={18} color={Colors.primary} />
+                <Bell size={18} color={primaryColor} />
               </View>
               <Text style={styles.rowLabel}>プッシュ通知</Text>
             </View>
             <Switch
               value={notifications}
               onValueChange={setNotifications}
-              trackColor={{ false: Colors.separator, true: Colors.accent }}
+              trackColor={{ false: Colors.separator, true: primaryColor }}
               thumbColor={Colors.white}
             />
           </View>
@@ -59,31 +70,64 @@ export default function SettingsScreen() {
           <View style={styles.row}>
             <View style={styles.rowLeft}>
               <View style={[styles.iconBox, { backgroundColor: '#E3F2FD' }]}>
-                <Bell size={18} color={Colors.primary} />
-              </View>
-              <Text style={styles.rowLabel}>メッセージプレビュー</Text>
-            </View>
-            <Switch
-              value={messagePreview}
-              onValueChange={setMessagePreview}
-              trackColor={{ false: Colors.separator, true: Colors.accent }}
-              thumbColor={Colors.white}
-            />
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.row}>
-            <View style={styles.rowLeft}>
-              <View style={[styles.iconBox, { backgroundColor: '#E3F2FD' }]}>
-                <Volume2 size={18} color={Colors.primary} />
+                <Volume2 size={18} color={primaryColor} />
               </View>
               <Text style={styles.rowLabel}>着信音</Text>
             </View>
             <Switch
               value={soundEnabled}
               onValueChange={handleSoundToggle}
-              trackColor={{ false: Colors.separator, true: Colors.accent }}
+              trackColor={{ false: Colors.separator, true: primaryColor }}
               thumbColor={Colors.white}
             />
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <View style={styles.rowLeft}>
+              <View style={[styles.iconBox, { backgroundColor: '#E3F2FD' }]}>
+                <MessageSquare size={18} color={primaryColor} />
+              </View>
+              <View>
+                <Text style={styles.rowLabel}>メッセージプレビュー</Text>
+                <Text style={styles.rowSub}>チャット一覧にメッセージ内容を表示</Text>
+              </View>
+            </View>
+            <Switch
+              value={messagePreview}
+              onValueChange={handleMessagePreviewToggle}
+              trackColor={{ false: Colors.separator, true: primaryColor }}
+              thumbColor={Colors.white}
+            />
+          </View>
+        </View>
+
+        <Text style={styles.section}>テーマ</Text>
+        <View style={styles.card}>
+          <View style={styles.themeRow}>
+            <View style={styles.rowLeft}>
+              <View style={[styles.iconBox, { backgroundColor: '#E3F2FD' }]}>
+                <Palette size={18} color={primaryColor} />
+              </View>
+              <Text style={styles.rowLabel}>テーマカラー</Text>
+            </View>
+            <View style={styles.colorGrid}>
+              {THEME_COLORS.map((item) => (
+                <TouchableOpacity
+                  key={item.color}
+                  onPress={() => setPrimaryColor(item.color)}
+                  style={[
+                    styles.colorDot,
+                    { backgroundColor: item.color },
+                    primaryColor === item.color && styles.colorDotSelected,
+                  ]}
+                  activeOpacity={0.8}
+                >
+                  {primaryColor === item.color && (
+                    <Text style={styles.checkmark}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         </View>
 
@@ -161,7 +205,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 13,
   },
-  rowLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  rowLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   iconBox: {
     width: 34,
     height: 34,
@@ -170,8 +214,38 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   rowLabel: { fontSize: 15, color: Colors.textPrimary, fontWeight: '500' },
+  rowSub: { fontSize: 11, color: Colors.textMuted, marginTop: 1 },
   rowValue: { fontSize: 14, color: Colors.textMuted },
   divider: { height: 1, backgroundColor: Colors.separator, marginLeft: 62 },
+  themeRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    gap: 12,
+  },
+  colorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginLeft: 46,
+  },
+  colorDot: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  colorDotSelected: {
+    borderWidth: 3,
+    borderColor: Colors.white,
+    shadowOpacity: 0.4,
+  },
+  checkmark: { color: Colors.white, fontSize: 18, fontWeight: '700' },
   profileInfo: { alignItems: 'center', marginTop: 24, gap: 4 },
   profileName: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
   profileHandle: { fontSize: 13, color: Colors.textMuted },

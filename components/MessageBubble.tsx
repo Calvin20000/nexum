@@ -23,13 +23,54 @@ interface MessageBubbleProps {
   showAvatar?: boolean;
   onImagePress?: (url: string) => void;
   onForward?: (imageUrl: string) => void;
+  onLongPress?: (message: Message) => void;
+  replyMessage?: Message | null;
+  replySenderName?: string;
 }
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
-export function MessageBubble({ message, isOwn, sender, showAvatar = true, onImagePress, onForward }: MessageBubbleProps) {
+export function QuotedMessage({ message, senderName }: { message: Message; senderName?: string }) {
+  const text = message.message_type === 'image' ? '📷 画像' : (message.content ?? '');
+  return (
+    <View style={quoteStyles.container}>
+      <View style={quoteStyles.bar} />
+      <View style={quoteStyles.content}>
+        {senderName ? <Text style={quoteStyles.name}>{senderName}</Text> : null}
+        <Text style={quoteStyles.text} numberOfLines={2}>{text}</Text>
+      </View>
+    </View>
+  );
+}
+
+const quoteStyles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.07)',
+    borderRadius: 8,
+    padding: 7,
+    marginBottom: 5,
+    gap: 6,
+  },
+  bar: { width: 3, backgroundColor: '#1976D2', borderRadius: 2 },
+  content: { flex: 1 },
+  name: { fontSize: 11, fontWeight: '700', color: '#1976D2', marginBottom: 2 },
+  text: { fontSize: 12, color: '#757575' },
+});
+
+export function MessageBubble({
+  message,
+  isOwn,
+  sender,
+  showAvatar = true,
+  onImagePress,
+  onForward,
+  onLongPress,
+  replyMessage,
+  replySenderName,
+}: MessageBubbleProps) {
   const { width: screenWidth } = useWindowDimensions();
   const time = formatTime(message.created_at);
   const isRead = !!message.read_at;
@@ -57,7 +98,11 @@ export function MessageBubble({ message, isOwn, sender, showAvatar = true, onIma
           />
         )}
         {!isOwn && !showAvatar && <View style={styles.avatarSpacer} />}
-        <View style={[styles.stickerWrapper, isOwn ? styles.stickerRight : styles.stickerLeft]}>
+        <TouchableOpacity
+          style={[styles.stickerWrapper, isOwn ? styles.stickerRight : styles.stickerLeft]}
+          onLongPress={() => onLongPress?.(message)}
+          activeOpacity={0.85}
+        >
           {!isOwn && sender && showAvatar && (
             <Text style={styles.senderName}>{sender.display_name || sender.handle}</Text>
           )}
@@ -71,20 +116,29 @@ export function MessageBubble({ message, isOwn, sender, showAvatar = true, onIma
             <Text style={styles.stickerEmoji}>{message.content}</Text>
             {!isOwn && <Text style={styles.timeOther}>{time}</Text>}
           </View>
-        </View>
+        </TouchableOpacity>
       </View>
     );
   }
 
   // Image
   if (message.message_type === 'image' && message.image_url) {
-    const imgW = screenWidth * 0.6;
+    const imgW = screenWidth * 0.55;
     const rawAspect =
       message.image_width && message.image_height
         ? message.image_width / message.image_height
         : 1;
-    // Clamp height: 60% wide, max 80% of screen width tall
-    const imgH = Math.min(imgW / rawAspect, screenWidth * 0.8);
+    const imgH = Math.min(imgW / rawAspect, screenWidth * 0.75);
+
+    const forwardBtn = onForward ? (
+      <TouchableOpacity
+        style={styles.forwardSideBtn}
+        onPress={() => onForward(message.image_url!)}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.forwardSideIcon}>📤</Text>
+      </TouchableOpacity>
+    ) : null;
 
     return (
       <View style={[styles.row, isOwn ? styles.rowRight : styles.rowLeft]}>
@@ -101,16 +155,18 @@ export function MessageBubble({ message, isOwn, sender, showAvatar = true, onIma
           {!isOwn && sender && showAvatar && (
             <Text style={styles.senderName}>{sender.display_name || sender.handle}</Text>
           )}
-          <View style={styles.stickerMeta}>
+          <View style={styles.imageOuterRow}>
             {isOwn && (
               <View style={styles.ownMeta}>
                 {isRead && <Text style={styles.readLabel}>既読</Text>}
                 <Text style={styles.timeOwn}>{time}</Text>
               </View>
             )}
+            {isOwn && forwardBtn}
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => onImagePress?.(message.image_url!)}
+              onLongPress={() => onLongPress?.(message)}
               style={[styles.imageBubble, isOwn ? styles.imageBubbleOwn : styles.imageBubbleOther]}
             >
               <Image
@@ -118,15 +174,8 @@ export function MessageBubble({ message, isOwn, sender, showAvatar = true, onIma
                 style={{ width: imgW, height: imgH, borderRadius: 14 }}
                 resizeMode="cover"
               />
-              {!isOwn && onForward && (
-                <TouchableOpacity
-                  style={styles.forwardBtn}
-                  onPress={() => onForward(message.image_url!)}
-                >
-                  <Text style={styles.forwardIcon}>📤</Text>
-                </TouchableOpacity>
-              )}
             </TouchableOpacity>
+            {!isOwn && forwardBtn}
             {!isOwn && <Text style={styles.timeOther}>{time}</Text>}
           </View>
         </View>
@@ -158,11 +207,18 @@ export function MessageBubble({ message, isOwn, sender, showAvatar = true, onIma
               <Text style={styles.timeOwn}>{time}</Text>
             </View>
           )}
-          <View style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleOther]}>
+          <TouchableOpacity
+            onLongPress={() => onLongPress?.(message)}
+            activeOpacity={0.85}
+            style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleOther]}
+          >
+            {replyMessage && (
+              <QuotedMessage message={replyMessage} senderName={replySenderName} />
+            )}
             <Text style={[styles.text, isOwn ? styles.textOwn : styles.textOther]}>
               {message.content}
             </Text>
-          </View>
+          </TouchableOpacity>
           {!isOwn && <Text style={styles.timeOther}>{time}</Text>}
         </View>
       </View>
@@ -240,6 +296,8 @@ const styles = StyleSheet.create({
   stickerMeta: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
   stickerEmoji: { fontSize: 72, lineHeight: 84 },
 
+  imageOuterRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
+
   imageBubble: {
     overflow: 'hidden',
     shadowColor: '#000',
@@ -250,16 +308,17 @@ const styles = StyleSheet.create({
   },
   imageBubbleOwn: { borderRadius: 14, borderBottomRightRadius: 4 },
   imageBubbleOther: { borderRadius: 14, borderBottomLeftRadius: 4 },
-  forwardBtn: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 16,
-    width: 32,
-    height: 32,
+
+  forwardSideBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#E3F2FD',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#BBDEFB',
+    marginBottom: 2,
   },
-  forwardIcon: { fontSize: 15 },
+  forwardSideIcon: { fontSize: 16 },
 });

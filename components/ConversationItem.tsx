@@ -7,6 +7,7 @@ import { Colors } from '@/lib/colors';
 interface ConversationItemProps {
   item: ConversationWithUser;
   onPress: () => void;
+  previewEnabled?: boolean;
 }
 
 function formatRelativeTime(iso: string): string {
@@ -21,18 +22,25 @@ function formatRelativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
 }
 
-export function ConversationItem({ item, onPress }: ConversationItemProps) {
+export function ConversationItem({ item, onPress, previewEnabled = true }: ConversationItemProps) {
   const lastMsg = item.last_message;
   const user = item.other_user;
   const isUnread = lastMsg && !lastMsg.read_at && lastMsg.sender_id !== user.id;
 
-  const previewText = lastMsg
-    ? lastMsg.is_deleted
-      ? 'メッセージが削除されました'
-      : lastMsg.message_type === 'image'
-      ? '[画像]'
-      : lastMsg.content ?? ''
-    : '';
+  let previewText = '';
+  if (lastMsg) {
+    if (lastMsg.is_deleted) {
+      previewText = 'メッセージが削除されました';
+    } else if (!previewEnabled) {
+      previewText = isUnread ? '新着メッセージがあります' : (
+        lastMsg.message_type === 'image' ? '📷 画像' : (lastMsg.content?.substring(0, 30) ?? '')
+      );
+    } else if (lastMsg.message_type === 'image') {
+      previewText = '📷 画像';
+    } else {
+      previewText = lastMsg.content?.substring(0, 30) ?? '';
+    }
+  }
 
   return (
     <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>

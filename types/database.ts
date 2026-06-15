@@ -79,6 +79,7 @@ export interface Database {
           image_height: number | null;
           read_at: string | null;
           is_deleted: boolean;
+          reply_to_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -92,6 +93,7 @@ export interface Database {
           image_height?: number | null;
           read_at?: string | null;
           is_deleted?: boolean;
+          reply_to_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -101,6 +103,7 @@ export interface Database {
           image_height?: number | null;
           read_at?: string | null;
           is_deleted?: boolean;
+          reply_to_id?: string | null;
         };
       };
       friendships: {

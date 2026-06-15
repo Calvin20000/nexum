@@ -11,11 +11,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Edit3 } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
 import { ConversationWithUser } from '@/types/database';
 import { ConversationItem } from '@/components/ConversationItem';
 import { Colors } from '@/lib/colors';
+
+const MESSAGE_PREVIEW_KEY = 'message_preview_enabled';
 
 function useSkeletonPulse() {
   const anim = useRef(new Animated.Value(0.4)).current;
@@ -104,9 +107,14 @@ export default function ChatsScreen() {
   const [conversations, setConversations] = useState<ConversationWithUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  // Auto-navigate to the most recent conversation on first load only.
-  // Once the user navigates back to this list, we stop redirecting.
+  const [previewEnabled, setPreviewEnabled] = useState(true);
   const hasAutoNavigated = useRef(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(MESSAGE_PREVIEW_KEY).then((val) => {
+      if (val !== null) setPreviewEnabled(val !== 'false');
+    });
+  }, []);
 
   const fetchConversations = useCallback(async () => {
     if (!session?.user) return;
@@ -229,6 +237,7 @@ export default function ChatsScreen() {
             <ConversationItem
               item={item}
               onPress={() => router.push(`/chat/${item.id}`)}
+              previewEnabled={previewEnabled}
             />
           )}
           ItemSeparatorComponent={() => <View style={styles.separator} />}

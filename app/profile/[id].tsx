@@ -10,16 +10,19 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { ChevronLeft, MessageCircle, UserPlus, Check, UserMinus } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
 import { UserProfile, Friendship } from '@/types/database';
 import { Avatar } from '@/components/Avatar';
 import { Colors } from '@/lib/colors';
 import { PhotoGallery } from '@/components/PhotoGallery';
+import { useTheme } from '@/lib/theme';
 
 export default function UserProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuthStore();
+  const { primaryColor } = useTheme();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [friendship, setFriendship] = useState<Friendship | null>(null);
   const [loading, setLoading] = useState(true);
@@ -120,7 +123,14 @@ export default function UserProfileScreen() {
       </View>
 
       <ScrollView>
-        <View style={styles.coverBg} />
+        <LinearGradient
+          colors={[primaryColor, Colors.secondary]}
+          style={styles.coverBg}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <Text style={styles.nexumLogo}>NEXUM</Text>
+        </LinearGradient>
 
         <View style={styles.profileSection}>
           <Avatar
@@ -214,7 +224,18 @@ const styles = StyleSheet.create({
   backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700', color: Colors.textPrimary },
   headerRight: { width: 36 },
-  coverBg: { height: 100, backgroundColor: Colors.primary },
+  coverBg: {
+    height: 100,
+    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+  },
+  nexumLogo: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: 'rgba(255,255,255,0.9)',
+    letterSpacing: 4,
+  },
   profileSection: {
     alignItems: 'center',
     marginTop: -44,

@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
 import { InAppNotification, InAppNotificationRef } from '@/components/ui/InAppNotification';
 import { registerPushToken } from '@/hooks/usePushNotification';
+import { ThemeProvider } from '@/lib/theme';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -122,21 +123,23 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="chat/new" options={{ presentation: 'card' }} />
-        <Stack.Screen name="chat/[id]" options={{ presentation: 'card' }} />
-        <Stack.Screen name="profile/[id]" options={{ presentation: 'card' }} />
-        <Stack.Screen name="profile/edit" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="friend/search" options={{ presentation: 'card' }} />
-        <Stack.Screen name="friend/requests" options={{ presentation: 'card' }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <AuthGuard />
-      <StatusBar style="auto" />
-      <InAppNotification ref={notificationRef} />
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="chat/new" options={{ presentation: 'card' }} />
+          <Stack.Screen name="chat/[id]" options={{ presentation: 'card' }} />
+          <Stack.Screen name="profile/[id]" options={{ presentation: 'card' }} />
+          <Stack.Screen name="profile/edit" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="friend/search" options={{ presentation: 'card' }} />
+          <Stack.Screen name="friend/requests" options={{ presentation: 'card' }} />
+          <Stack.Screen name="+not-found" />
+        </Stack>
+        <AuthGuard />
+        <StatusBar style="auto" />
+        <InAppNotification ref={notificationRef} />
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }

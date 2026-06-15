@@ -13,6 +13,7 @@ import {
   Modal,
   Alert,
   Image,
+  Clipboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -25,7 +26,7 @@ import { supabase } from '@/lib/supabase';
 import { uploadImageToStorage, getMimeInfo } from '@/lib/imageUpload';
 import { useAuthStore } from '@/stores/authStore';
 import { Message, UserProfile } from '@/types/database';
-import { MessageBubble } from '@/components/MessageBubble';
+import { MessageBubble, QuotedMessage } from '@/components/MessageBubble';
 import { EmojiPicker } from '@/components/EmojiPicker';
 import { StickerPicker, Sticker as StickerType } from '@/components/StickerPicker';
 import { Avatar } from '@/components/Avatar';
@@ -65,6 +66,8 @@ export default function ChatScreen() {
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [forwardImageUrl, setForwardImageUrl] = useState<string | null>(null);
   const [forwardFriends, setForwardFriends] = useState<any[]>([]);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [actionMessage, setActionMessage] = useState<Message | null>(null);
   // On web: position the container to exactly match the visual viewport (handles keyboard + IME bar).
   type WebContainerStyle = { position: 'absolute'; top: number; left: number; right: number; height: number };
   const [webStyle, setWebStyle] = useState<WebContainerStyle | undefined>(() => {
@@ -200,6 +203,32 @@ export default function ChatScreen() {
   };
 
   const handleForwardClose = () => setForwardImageUrl(null);
+
+  const handleLongPress = (msg: Message) => {
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setActionMessage(msg);
+  };
+
+  const handleReply = (msg: Message) => {
+    setReplyTo(msg);
+    setActionMessage(null);
+    setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
+  const handleCopyMessage = (msg: Message) => {
+    const text = msg.message_type === 'image' ? msg.image_url ?? '' : msg.content ?? '';
+    if (Platform.OS === 'web') {
+      navigator.clipboard?.writeText(text);
+    } else {
+      Clipboard.setString(text);
+    }
+    setActionMessage(null);
+  };
+
+  const handleDeleteMessage = async (msg: Message) => {
+    setActionMessage(null);
+    await supabase.from('messages').update({ is_deleted: true }).eq('id', msg.id);
+  };
 
   const fetchData = useCallback(async () => {
     if (!id || !userId) return;
@@ -398,6 +427,7 @@ export default function ChatScreen() {
     image_height: null,
     read_at: null,
     is_deleted: false,
+    reply_to_id: null,
     created_at: new Date().toISOString(),
     ...overrides,
   });
@@ -407,14 +437,26 @@ export default function ChatScreen() {
     setSending(true);
     clearTyping();
 
-    const temp = makeTempMessage({ message_type: 'text', content: content.trim() });
-    // Prepend: inverted list puts index-0 at visual bottom → user sees the new message
+    const currentReplyTo = replyTo;
+    setReplyTo(null);
+
+    const temp = makeTempMessage({
+      message_type: 'text',
+      content: content.trim(),
+      reply_to_id: currentReplyTo?.id ?? null,
+    });
     setMessages((prev) => [temp, ...prev]);
     scrollToBottom();
 
     const { data: msg, error } = await supabase
       .from('messages')
-      .insert({ conversation_id: id, sender_id: userId, message_type: 'text', content: content.trim() })
+      .insert({
+        conversation_id: id,
+        sender_id: userId,
+        message_type: 'text',
+        content: content.trim(),
+        reply_to_id: currentReplyTo?.id ?? null,
+      })
       .select()
       .single();
 
@@ -681,6 +723,8 @@ export default function ChatScreen() {
     const showAvatar = !isOwn && (
       !prevMsg || prevMsg.sender_id !== item.sender_id || prevMsg.message_type === 'sticker'
     );
+    const replyMsg = item.reply_to_id ? messages.find((m) => m.id === item.reply_to_id) ?? null : null;
+    const replySender = replyMsg ? senderMap[replyMsg.sender_id] : undefined;
     return (
       <MessageBubble
         message={item}
@@ -689,6 +733,9 @@ export default function ChatScreen() {
         showAvatar={showAvatar}
         onImagePress={setFullscreenImage}
         onForward={handleForwardOpen}
+        onLongPress={handleLongPress}
+        replyMessage={replyMsg}
+        replySenderName={replySender?.display_name || replySender?.handle}
       />
     );
   }, [userId, senderMap, messages]);
@@ -836,6 +883,25 @@ export default function ChatScreen() {
 
           {panel === 'emoji' && <EmojiPicker onSelect={handleEmojiSelect} />}
           {panel === 'sticker' && <StickerPicker onSelect={handleStickerSelect} />}
+
+          {replyTo && (
+            <View style={styles.replyBar}>
+              <View style={styles.replyBarLine} />
+              <View style={styles.replyBarContent}>
+                <Text style={styles.replyBarName}>
+                  {senderMap[replyTo.sender_id]?.display_name ||
+                    senderMap[replyTo.sender_id]?.handle ||
+                    '返信先'}
+                </Text>
+                <Text style={styles.replyBarText} numberOfLines={1}>
+                  {replyTo.message_type === 'image' ? '📷 画像' : replyTo.content}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setReplyTo(null)} style={styles.replyBarCancel}>
+                <X size={18} color={Colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+          )}
         </KeyboardAvoidingView>
       </SafeAreaView>
 
@@ -919,6 +985,54 @@ export default function ChatScreen() {
           </View>
         </Modal>
       )}
+
+      {/* ── Long-press Action Menu ── */}
+      <Modal
+        visible={!!actionMessage}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setActionMessage(null)}
+      >
+        <TouchableOpacity
+          style={styles.actionOverlay}
+          activeOpacity={1}
+          onPress={() => setActionMessage(null)}
+        >
+          <View style={styles.actionMenu}>
+            <TouchableOpacity
+              style={styles.actionItem}
+              onPress={() => actionMessage && handleReply(actionMessage)}
+            >
+              <Text style={styles.actionIcon}>↩️</Text>
+              <Text style={styles.actionText}>返信</Text>
+            </TouchableOpacity>
+            {actionMessage && (actionMessage.message_type === 'text' || actionMessage.message_type === 'sticker') && (
+              <>
+                <View style={styles.actionDivider} />
+                <TouchableOpacity
+                  style={styles.actionItem}
+                  onPress={() => actionMessage && handleCopyMessage(actionMessage)}
+                >
+                  <Text style={styles.actionIcon}>📋</Text>
+                  <Text style={styles.actionText}>コピー</Text>
+                </TouchableOpacity>
+              </>
+            )}
+            {actionMessage && actionMessage.sender_id === userId && (
+              <>
+                <View style={styles.actionDivider} />
+                <TouchableOpacity
+                  style={styles.actionItem}
+                  onPress={() => actionMessage && handleDeleteMessage(actionMessage)}
+                >
+                  <Text style={styles.actionIcon}>🗑️</Text>
+                  <Text style={[styles.actionText, styles.actionTextDelete]}>削除</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* ── Forward Modal ── */}
       <Modal
@@ -1290,4 +1404,51 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: Colors.textSecondary,
   },
+
+  // Reply bar
+  replyBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#BBDEFB',
+    gap: 8,
+  },
+  replyBarLine: { width: 3, height: 36, backgroundColor: '#1976D2', borderRadius: 2 },
+  replyBarContent: { flex: 1 },
+  replyBarName: { fontSize: 12, fontWeight: '700', color: '#1976D2', marginBottom: 2 },
+  replyBarText: { fontSize: 12, color: Colors.textSecondary },
+  replyBarCancel: { padding: 4 },
+
+  // Action menu
+  actionOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionMenu: {
+    backgroundColor: Colors.white,
+    borderRadius: 16,
+    paddingVertical: 4,
+    width: 210,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
+  actionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    gap: 14,
+  },
+  actionIcon: { fontSize: 20 },
+  actionText: { fontSize: 16, color: Colors.textPrimary, fontWeight: '500' },
+  actionTextDelete: { color: '#F44336' },
+  actionDivider: { height: 1, backgroundColor: Colors.separator, marginHorizontal: 12 },
 });
