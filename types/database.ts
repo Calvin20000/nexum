@@ -125,6 +125,23 @@ export interface Database {
           updated_at?: string;
         };
       };
+      profile_photos: {
+        Row: {
+          id: string;
+          user_id: string;
+          photo_url: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          photo_url: string;
+          created_at?: string;
+        };
+        Update: {
+          photo_url?: string;
+        };
+      };
       blocked_users: {
         Row: {
           id: string;
@@ -175,6 +192,4 @@ export type ConversationWithUser = Conversation & {
   last_message?: Message | null;
 };
 
-export type MessageWithSender = Message & {
-  sender: UserProfile;
-};
+export type ProfilePhoto = Database['public']['Tables']['profile_photos']['Row'];

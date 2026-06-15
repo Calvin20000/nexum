@@ -15,6 +15,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { UserProfile, Friendship } from '@/types/database';
 import { Avatar } from '@/components/Avatar';
 import { Colors } from '@/lib/colors';
+import { PhotoGallery } from '@/components/PhotoGallery';
 
 export default function UserProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -112,7 +113,9 @@ export default function UserProfileScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <ChevronLeft size={24} color={Colors.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>プロフィール</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          {profile.display_name || profile.handle}のプロフィール
+        </Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -188,6 +191,8 @@ export default function UserProfileScreen() {
             )}
           </View>
         )}
+
+        <PhotoGallery userId={profile.id} isOwner={isSelf} />
       </ScrollView>
     </SafeAreaView>
   );

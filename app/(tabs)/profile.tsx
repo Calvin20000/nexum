@@ -17,6 +17,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { useAuthStore } from '@/stores/authStore';
 import { Avatar } from '@/components/Avatar';
 import { Colors } from '@/lib/colors';
+import { PhotoGallery } from '@/components/PhotoGallery';
 
 export default function ProfileScreen() {
   const { profile, session, signOut, fetchProfile } = useAuthStore();
@@ -111,6 +112,8 @@ export default function ProfileScreen() {
             <Text style={styles.editBtnText}>プロフィールを編集</Text>
           </TouchableOpacity>
         </View>
+
+        <PhotoGallery userId={profile.id} isOwner={true} />
 
         {/* QR Code Card */}
         <View style={styles.qrSection}>
