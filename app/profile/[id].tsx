@@ -124,12 +124,15 @@ export default function UserProfileScreen() {
 
       <ScrollView>
         <LinearGradient
-          colors={[primaryColor, Colors.secondary]}
+          colors={[primaryColor, primaryColor + 'CC']}
           style={styles.coverBg}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
-          <Text style={styles.nexumLogo}>NEXUM</Text>
+          <Text style={[
+            styles.nexumLogo,
+            primaryColor === '#EEEEEE' && { color: '#424242' },
+          ]}>NEXUM</Text>
         </LinearGradient>
 
         <View style={styles.profileSection}>
@@ -226,15 +229,17 @@ const styles = StyleSheet.create({
   headerRight: { width: 36 },
   coverBg: {
     height: 100,
-    justifyContent: 'flex-end',
-    paddingHorizontal: 16,
-    paddingBottom: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   nexumLogo: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: '900',
-    color: 'rgba(255,255,255,0.9)',
-    letterSpacing: 4,
+    color: 'rgba(255,255,255,0.92)',
+    letterSpacing: 6,
+    textShadowColor: 'rgba(0,0,0,0.15)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   profileSection: {
     alignItems: 'center',

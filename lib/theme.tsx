@@ -40,10 +40,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 }
 
 export const THEME_COLORS = [
-  { name: 'ブルー',   color: '#0D47A1' },
-  { name: 'ネイビー', color: '#1A237E' },
-  { name: 'ティール', color: '#00695C' },
-  { name: 'パープル', color: '#4A148C' },
-  { name: 'グレー',   color: '#37474F' },
-  { name: 'ブラック', color: '#212121' },
+  { name: 'ブルー',     color: '#0D47A1' },
+  { name: 'スカイ',     color: '#0288D1' },
+  { name: 'ネイビー',   color: '#1A237E' },
+  { name: 'ティール',   color: '#00695C' },
+  { name: 'グリーン',   color: '#2E7D32' },
+  { name: 'ライム',     color: '#558B2F' },
+  { name: 'レッド',     color: '#C62828' },
+  { name: 'ピンク',     color: '#AD1457' },
+  { name: 'オレンジ',   color: '#E65100' },
+  { name: 'イエロー',   color: '#F9A825' },
+  { name: 'パープル',   color: '#4A148C' },
+  { name: 'グレー',     color: '#37474F' },
+  { name: 'ブラック',   color: '#212121' },
+  { name: 'ホワイト',   color: '#EEEEEE' },
 ];

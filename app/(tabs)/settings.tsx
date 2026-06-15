@@ -111,22 +111,34 @@ export default function SettingsScreen() {
               <Text style={styles.rowLabel}>テーマカラー</Text>
             </View>
             <View style={styles.colorGrid}>
-              {THEME_COLORS.map((item) => (
-                <TouchableOpacity
-                  key={item.color}
-                  onPress={() => setPrimaryColor(item.color)}
-                  style={[
-                    styles.colorDot,
-                    { backgroundColor: item.color },
-                    primaryColor === item.color && styles.colorDotSelected,
-                  ]}
-                  activeOpacity={0.8}
-                >
-                  {primaryColor === item.color && (
-                    <Text style={styles.checkmark}>✓</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
+              {THEME_COLORS.map((item) => {
+                const isLight = item.color === '#EEEEEE' || item.color === '#F9A825';
+                const isSelected = primaryColor === item.color;
+                return (
+                  <TouchableOpacity
+                    key={item.color}
+                    onPress={() => setPrimaryColor(item.color)}
+                    style={styles.colorItem}
+                    activeOpacity={0.8}
+                  >
+                    <View
+                      style={[
+                        styles.colorDot,
+                        { backgroundColor: item.color },
+                        isLight && styles.colorDotLight,
+                        isSelected && styles.colorDotSelected,
+                      ]}
+                    >
+                      {isSelected && (
+                        <Text style={[styles.checkmark, isLight && styles.checkmarkDark]}>✓</Text>
+                      )}
+                    </View>
+                    <Text style={[styles.colorName, isSelected && styles.colorNameSelected]}>
+                      {item.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         </View>
@@ -228,6 +240,11 @@ const styles = StyleSheet.create({
     gap: 10,
     marginLeft: 46,
   },
+  colorItem: {
+    alignItems: 'center',
+    gap: 4,
+    width: 44,
+  },
   colorDot: {
     width: 40,
     height: 40,
@@ -240,12 +257,19 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
   },
+  colorDotLight: {
+    borderWidth: 1,
+    borderColor: '#BDBDBD',
+  },
   colorDotSelected: {
     borderWidth: 3,
     borderColor: Colors.white,
     shadowOpacity: 0.4,
   },
-  checkmark: { color: Colors.white, fontSize: 18, fontWeight: '700' },
+  checkmark: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  checkmarkDark: { color: '#424242' },
+  colorName: { fontSize: 9, color: Colors.textMuted, textAlign: 'center' },
+  colorNameSelected: { color: Colors.textPrimary, fontWeight: '700' },
   profileInfo: { alignItems: 'center', marginTop: 24, gap: 4 },
   profileName: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
   profileHandle: { fontSize: 13, color: Colors.textMuted },
