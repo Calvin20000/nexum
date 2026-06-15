@@ -1,0 +1,1 @@
+ALTER TABLE public.profile_photos ADD COLUMN IF NOT EXISTS caption text;

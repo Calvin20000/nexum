@@ -19,11 +19,12 @@ import { useAuthStore } from '@/stores/authStore';
 import { Avatar } from '@/components/Avatar';
 import { Colors } from '@/lib/colors';
 import { PhotoGallery } from '@/components/PhotoGallery';
-import { useTheme } from '@/lib/theme';
+import { useTheme, useColors } from '@/lib/theme';
 
 export default function ProfileScreen() {
   const { profile, session, signOut, fetchProfile } = useAuthStore();
   const { primaryColor } = useTheme();
+  const C = useColors();
   const [showQR, setShowQR] = useState(false);
   const [copied, setCopied] = useState(false);
   const insets = useSafeAreaInsets();
@@ -97,7 +98,7 @@ export default function ProfileScreen() {
               size={88}
             />
             <TouchableOpacity
-              style={styles.editAvatarBtn}
+              style={[styles.editAvatarBtn, { backgroundColor: C.primary }]}
               onPress={() => router.push('/profile/edit')}
             >
               <Edit2 size={14} color={Colors.white} />
@@ -118,7 +119,7 @@ export default function ProfileScreen() {
 
         <View style={styles.actions}>
           <TouchableOpacity
-            style={styles.editBtn}
+            style={[styles.editBtn, { backgroundColor: C.primary }]}
             onPress={() => router.push('/profile/edit')}
           >
             <Edit2 size={18} color={Colors.white} />
@@ -141,7 +142,7 @@ export default function ProfileScreen() {
                 <QRCode
                   value={qrValue}
                   size={72}
-                  color={Colors.primary}
+                  color={C.primary}
                   backgroundColor="white"
                 />
               </View>
@@ -150,12 +151,12 @@ export default function ProfileScreen() {
               <Text style={styles.qrCardTitle}>マイQRコード</Text>
               <Text style={styles.qrCardHandle}>@{profile.handle}</Text>
               <View style={styles.qrCardBadge}>
-                <QrCode size={11} color={Colors.secondary} />
+                <QrCode size={11} color={C.primary} />
                 <Text style={styles.qrCardBadgeText}>タップして拡大</Text>
               </View>
             </View>
             <View style={styles.qrCardChevron}>
-              <View style={styles.qrCardChevronDot} />
+              <View style={[styles.qrCardChevronDot, { backgroundColor: C.primary }]} />
             </View>
           </TouchableOpacity>
         </View>
@@ -167,6 +168,7 @@ export default function ProfileScreen() {
               year: 'numeric',
               month: 'long',
             })}
+            primaryColor={C.primary}
           />
         </View>
 
@@ -174,7 +176,7 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>アカウント</Text>
           <View style={styles.menuCard}>
             <MenuItem
-              icon={<Edit2 size={18} color={Colors.primary} />}
+              icon={<Edit2 size={18} color={C.primary} />}
               label="プロフィール編集"
               onPress={() => router.push('/profile/edit')}
             />
@@ -208,19 +210,17 @@ export default function ProfileScreen() {
               <X size={22} color={Colors.textSecondary} />
             </TouchableOpacity>
             <Text style={styles.qrScreenTitle}>マイQRコード</Text>
-            <TouchableOpacity
-              style={styles.qrShareBtn}
-              onPress={handleShare}
+            <TouchableOpacity style={styles.qrShareBtn} onPress={handleShare}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Share2 size={20} color={Colors.primary} />
+              <Share2 size={20} color={C.primary} />
             </TouchableOpacity>
           </View>
 
           {/* Card */}
           <View style={styles.qrCardFull}>
             {/* Top accent */}
-            <View style={styles.qrCardAccent} />
+            <View style={[styles.qrCardAccent, { backgroundColor: C.primary }]} />
 
             {/* Avatar + name */}
             <View style={styles.qrCardProfile}>
@@ -256,7 +256,7 @@ export default function ProfileScreen() {
                 <QRCode
                   value={qrValue}
                   size={220}
-                  color={Colors.primary}
+                  color={C.primary}
                   backgroundColor="white"
                   logo={require('@/assets/images/icon.png')}
                   logoSize={44}
@@ -267,10 +267,10 @@ export default function ProfileScreen() {
                 />
               </View>
               {/* Corner decorations */}
-              <View style={[styles.corner, styles.cornerTL]} />
-              <View style={[styles.corner, styles.cornerTR]} />
-              <View style={[styles.corner, styles.cornerBL]} />
-              <View style={[styles.corner, styles.cornerBR]} />
+              <View style={[styles.corner, styles.cornerTL, { borderColor: C.primary }]} />
+              <View style={[styles.corner, styles.cornerTR, { borderColor: C.primary }]} />
+              <View style={[styles.corner, styles.cornerBL, { borderColor: C.primary }]} />
+              <View style={[styles.corner, styles.cornerBR, { borderColor: C.primary }]} />
             </View>
 
             <Text style={styles.qrHint}>
@@ -279,7 +279,7 @@ export default function ProfileScreen() {
           </View>
 
           {/* Bottom action */}
-          <TouchableOpacity style={styles.qrShareFullBtn} onPress={handleShare} activeOpacity={0.85}>
+          <TouchableOpacity style={[styles.qrShareFullBtn, { backgroundColor: C.primary, shadowColor: C.primary }]} onPress={handleShare} activeOpacity={0.85}>
             <Share2 size={18} color={Colors.white} />
             <Text style={styles.qrShareFullText}>ハンドルをシェア</Text>
           </TouchableOpacity>
@@ -289,10 +289,10 @@ export default function ProfileScreen() {
   );
 }
 
-function StatBlock({ label, value }: { label: string; value: string }) {
+function StatBlock({ label, value, primaryColor }: { label: string; value: string; primaryColor: string }) {
   return (
     <View style={styles.statBlock}>
-      <Text style={styles.statValue}>{value}</Text>
+      <Text style={[styles.statValue, { color: primaryColor }]}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
@@ -356,7 +356,6 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: Colors.secondary,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -393,7 +392,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: Colors.primary,
     borderRadius: 12,
     paddingVertical: 13,
   },
@@ -418,7 +416,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    shadowColor: Colors.primary,
+    shadowColor: '#000',
     shadowOpacity: 0.08,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 3 },
@@ -487,7 +485,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  statValue: { fontSize: 14, fontWeight: '700', color: Colors.primary },
+  statValue: { fontSize: 14, fontWeight: '700' },
   statLabel: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
   menuSection: { paddingHorizontal: 24, marginBottom: 32 },
   menuCard: {

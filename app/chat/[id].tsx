@@ -70,6 +70,7 @@ export default function ChatScreen() {
   const [forwardFriends, setForwardFriends] = useState<any[]>([]);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [actionMessage, setActionMessage] = useState<Message | null>(null);
+  const [replyCache, setReplyCache] = useState<Record<string, Message>>({});
   // On web: position the container to exactly match the visual viewport (handles keyboard + IME bar).
   type WebContainerStyle = { position: 'absolute'; top: number; left: number; right: number; height: number };
   const [webStyle, setWebStyle] = useState<WebContainerStyle | undefined>(() => {
@@ -725,7 +726,23 @@ export default function ChatScreen() {
     const showAvatar = !isOwn && (
       !prevMsg || prevMsg.sender_id !== item.sender_id || prevMsg.message_type === 'sticker'
     );
-    const replyMsg = item.reply_to_id ? messages.find((m) => m.id === item.reply_to_id) ?? null : null;
+
+    let replyMsg: Message | null = null;
+    if (item.reply_to_id) {
+      replyMsg = messages.find((m) => m.id === item.reply_to_id) ?? replyCache[item.reply_to_id] ?? null;
+      if (!replyMsg && !replyCache[item.reply_to_id]) {
+        // Fetch asynchronously and store in cache
+        supabase
+          .from('messages')
+          .select('*')
+          .eq('id', item.reply_to_id)
+          .maybeSingle()
+          .then(({ data }) => {
+            if (data) setReplyCache((prev) => ({ ...prev, [data.id]: data }));
+          });
+      }
+    }
+
     const replySender = replyMsg ? senderMap[replyMsg.sender_id] : undefined;
     return (
       <MessageBubble
@@ -740,7 +757,7 @@ export default function ChatScreen() {
         replySenderName={replySender?.display_name || replySender?.handle}
       />
     );
-  }, [userId, senderMap, messages]);
+  }, [userId, senderMap, messages, replyCache]);
 
   if (loading) {
     return (

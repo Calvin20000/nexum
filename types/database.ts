@@ -133,16 +133,19 @@ export interface Database {
           id: string;
           user_id: string;
           photo_url: string;
+          caption: string | null;
           created_at: string;
         };
         Insert: {
           id?: string;
           user_id: string;
           photo_url: string;
+          caption?: string | null;
           created_at?: string;
         };
         Update: {
           photo_url?: string;
+          caption?: string | null;
         };
       };
       blocked_users: {
