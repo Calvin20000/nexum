@@ -22,13 +22,14 @@ interface MessageBubbleProps {
   sender?: UserProfile;
   showAvatar?: boolean;
   onImagePress?: (url: string) => void;
+  onForward?: (imageUrl: string) => void;
 }
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
-export function MessageBubble({ message, isOwn, sender, showAvatar = true, onImagePress }: MessageBubbleProps) {
+export function MessageBubble({ message, isOwn, sender, showAvatar = true, onImagePress, onForward }: MessageBubbleProps) {
   const { width: screenWidth } = useWindowDimensions();
   const time = formatTime(message.created_at);
   const isRead = !!message.read_at;
@@ -117,6 +118,14 @@ export function MessageBubble({ message, isOwn, sender, showAvatar = true, onIma
                 style={{ width: imgW, height: imgH, borderRadius: 14 }}
                 resizeMode="cover"
               />
+              {!isOwn && onForward && (
+                <TouchableOpacity
+                  style={styles.forwardBtn}
+                  onPress={() => onForward(message.image_url!)}
+                >
+                  <Text style={styles.forwardIcon}>📤</Text>
+                </TouchableOpacity>
+              )}
             </TouchableOpacity>
             {!isOwn && <Text style={styles.timeOther}>{time}</Text>}
           </View>
@@ -241,4 +250,16 @@ const styles = StyleSheet.create({
   },
   imageBubbleOwn: { borderRadius: 14, borderBottomRightRadius: 4 },
   imageBubbleOther: { borderRadius: 14, borderBottomLeftRadius: 4 },
+  forwardBtn: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 16,
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  forwardIcon: { fontSize: 15 },
 });

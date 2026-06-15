@@ -2,16 +2,19 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
-  FlatList,
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
   Animated,
+  Modal,
+  TextInput,
+  Alert,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { UserPlus, Bell, MessageCircle } from 'lucide-react-native';
+import { UserPlus, Bell, MessageCircle, Users, Plus, X, Trash2 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
 import { Friendship, UserProfile } from '@/types/database';
@@ -61,43 +64,24 @@ function FriendsListSkeleton() {
 }
 
 const skeletonStyles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: Colors.white,
-    gap: 12,
-  },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: Colors.border,
-  },
+  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.white, gap: 12 },
+  avatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: Colors.border },
   body: { flex: 1, gap: 8 },
-  lineName: {
-    height: 14,
-    width: '45%',
-    borderRadius: 7,
-    backgroundColor: Colors.border,
-  },
-  lineHandle: {
-    height: 11,
-    width: '30%',
-    borderRadius: 5,
-    backgroundColor: Colors.surface,
-  },
-  actionBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.border,
-  },
+  lineName: { height: 14, width: '45%', borderRadius: 7, backgroundColor: Colors.border },
+  lineHandle: { height: 11, width: '30%', borderRadius: 5, backgroundColor: Colors.surface },
+  actionBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.border },
   sep: { height: 1, backgroundColor: Colors.separator, marginLeft: 78 },
 });
 
 type FriendWithUser = Friendship & { friend: UserProfile };
+
+interface FriendGroup {
+  id: string;
+  name: string;
+  owner_id: string;
+  created_at: string;
+  members?: UserProfile[];
+}
 
 export default function FriendsScreen() {
   const { session } = useAuthStore();
@@ -105,35 +89,33 @@ export default function FriendsScreen() {
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [startingId, setStartingId] = useState<string | null>(null);
+
+  const [groups, setGroups] = useState<FriendGroup[]>([]);
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [groupName, setGroupName] = useState('');
+  const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<FriendGroup | null>(null);
 
   const fetchFriends = useCallback(async () => {
     if (!session?.user) return;
     const userId = session.user.id;
-
     const { data, error } = await supabase
       .from('friendships')
       .select('*')
       .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`)
       .eq('status', 'accepted');
 
-    if (error || !data) {
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
+    if (error || !data) { setLoading(false); setRefreshing(false); return; }
 
     const enriched: FriendWithUser[] = await Promise.all(
       data.map(async (f) => {
         const friendId = f.requester_id === userId ? f.addressee_id : f.requester_id;
-        const { data: user } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', friendId)
-          .maybeSingle();
+        const { data: user } = await supabase.from('users').select('*').eq('id', friendId).maybeSingle();
         return { ...f, friend: user! };
       })
     );
-
     setFriends(enriched.filter((f) => f.friend != null));
 
     const { count } = await supabase
@@ -142,16 +124,79 @@ export default function FriendsScreen() {
       .eq('addressee_id', userId)
       .eq('status', 'pending');
     setPendingCount(count ?? 0);
-
     setLoading(false);
     setRefreshing(false);
   }, [session]);
 
+  const fetchGroups = useCallback(async () => {
+    if (!session?.user) return;
+    const userId = session.user.id;
+    const { data: groupData } = await supabase
+      .from('friend_groups')
+      .select('*')
+      .eq('owner_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (!groupData) return;
+    const withMembers = await Promise.all(
+      (groupData as any[]).map(async (g) => {
+        const { data: memberRows } = await supabase
+          .from('friend_group_members')
+          .select('user_id')
+          .eq('group_id', g.id);
+        const memberIds = (memberRows ?? []).map((m: any) => m.user_id);
+        let members: UserProfile[] = [];
+        if (memberIds.length > 0) {
+          const { data: users } = await supabase.from('users').select('*').in('id', memberIds);
+          members = (users ?? []) as UserProfile[];
+        }
+        return { ...g, members };
+      })
+    );
+    setGroups(withMembers);
+  }, [session]);
+
   useEffect(() => {
     fetchFriends();
-  }, [fetchFriends]);
+    fetchGroups();
+  }, [fetchFriends, fetchGroups]);
 
-  const [startingId, setStartingId] = useState<string | null>(null);
+  const createGroup = async () => {
+    if (!groupName.trim() || !session?.user) return;
+    setCreatingGroup(true);
+    const userId = session.user.id;
+    const { data: group, error } = await supabase
+      .from('friend_groups')
+      .insert({ owner_id: userId, name: groupName.trim() })
+      .select()
+      .single();
+
+    if (error || !group) { setCreatingGroup(false); return; }
+    if (selectedFriendIds.length > 0) {
+      await supabase.from('friend_group_members').insert(
+        selectedFriendIds.map((uid) => ({ group_id: (group as any).id, user_id: uid }))
+      );
+    }
+    setGroupName('');
+    setSelectedFriendIds([]);
+    setShowCreateGroup(false);
+    setCreatingGroup(false);
+    fetchGroups();
+  };
+
+  const deleteGroup = (groupId: string) => {
+    Alert.alert('グループを削除', 'このグループを削除しますか？', [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '削除', style: 'destructive',
+        onPress: async () => {
+          await supabase.from('friend_groups').delete().eq('id', groupId);
+          setSelectedGroup(null);
+          fetchGroups();
+        },
+      },
+    ]);
+  };
 
   const startChat = async (friendId: string) => {
     if (!session?.user || startingId) return;
@@ -159,32 +204,18 @@ export default function FriendsScreen() {
     const userId = session.user.id;
     const p1 = userId < friendId ? userId : friendId;
     const p2 = userId < friendId ? friendId : userId;
-
     let { data: existing } = await supabase
-      .from('conversations')
-      .select('id')
-      .eq('participant_1_id', p1)
-      .eq('participant_2_id', p2)
-      .maybeSingle();
-
+      .from('conversations').select('id')
+      .eq('participant_1_id', p1).eq('participant_2_id', p2).maybeSingle();
     if (!existing) {
       const { data: created } = await supabase
         .from('conversations')
         .insert({ participant_1_id: p1, participant_2_id: p2 })
-        .select('id')
-        .single();
+        .select('id').single();
       existing = created;
     }
-
-    if (existing) {
-      router.push(`/chat/${existing.id}`);
-    }
+    if (existing) router.push(`/chat/${(existing as any).id}`);
     setStartingId(null);
-  };
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchFriends();
   };
 
   return (
@@ -192,21 +223,13 @@ export default function FriendsScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>フレンド</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.headerBtn}
-            onPress={() => router.push('/friend/requests')}
-          >
+          <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/friend/requests')}>
             <Bell size={20} color={Colors.primary} />
             {pendingCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{pendingCount}</Text>
-              </View>
+              <View style={styles.badge}><Text style={styles.badgeText}>{pendingCount}</Text></View>
             )}
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerBtn}
-            onPress={() => router.push('/friend/search')}
-          >
+          <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/friend/search')}>
             <UserPlus size={20} color={Colors.primary} />
           </TouchableOpacity>
         </View>
@@ -214,59 +237,186 @@ export default function FriendsScreen() {
 
       {loading ? (
         <FriendsListSkeleton />
-      ) : friends.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>フレンドがいません</Text>
-          <Text style={styles.emptySubtitle}>@IDで友達を検索して申請しましょう</Text>
-          <TouchableOpacity
-            style={styles.addBtn}
-            onPress={() => router.push('/friend/search')}
-          >
-            <Text style={styles.addBtnText}>フレンドを追加</Text>
-          </TouchableOpacity>
-        </View>
       ) : (
-        <FlatList
-          data={friends}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.friendItem}
-              onPress={() => startChat(item.friend.id)}
-              activeOpacity={0.7}
-              disabled={!!startingId}
-            >
-              <View style={styles.friendLeft}>
-                <TouchableOpacity onPress={() => router.push(`/profile/${item.friend.id}`)}>
-                  <Avatar
-                    uri={item.friend.avatar_url}
-                    name={item.friend.display_name || item.friend.handle}
-                    size={50}
-                    online={item.friend.is_online}
-                  />
-                </TouchableOpacity>
-                <View style={styles.friendInfo}>
-                  <Text style={styles.friendName}>
-                    {item.friend.display_name || item.friend.handle}
-                  </Text>
-                  <Text style={styles.friendHandle}>@{item.friend.handle}</Text>
-                </View>
-              </View>
-              {startingId === item.friend.id ? (
-                <ActivityIndicator size="small" color={Colors.primary} />
-              ) : (
-                <View style={styles.chatBtn}>
-                  <MessageCircle size={20} color={Colors.primary} />
-                </View>
-              )}
-            </TouchableOpacity>
-          )}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
+        <ScrollView
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => { setRefreshing(true); fetchFriends(); fetchGroups(); }}
+              tintColor={Colors.primary}
+            />
           }
-        />
+        >
+          {/* グループセクション */}
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionLeft}>
+              <Users size={14} color={Colors.primary} />
+              <Text style={styles.sectionLabel}>グループ</Text>
+            </View>
+            <TouchableOpacity style={styles.createGroupBtn} onPress={() => setShowCreateGroup(true)}>
+              <Plus size={13} color={Colors.white} />
+              <Text style={styles.createGroupText}>作成</Text>
+            </TouchableOpacity>
+          </View>
+
+          {groups.length === 0 ? (
+            <View style={styles.groupEmpty}>
+              <Text style={styles.groupEmptyText}>グループがありません</Text>
+            </View>
+          ) : (
+            groups.map((group) => (
+              <TouchableOpacity key={group.id} style={styles.groupItem} onPress={() => setSelectedGroup(group)} activeOpacity={0.7}>
+                <View style={styles.groupIcon}><Users size={18} color={Colors.primary} /></View>
+                <View style={styles.groupInfo}>
+                  <Text style={styles.groupName}>{group.name}</Text>
+                  <Text style={styles.groupMemberCount}>{group.members?.length ?? 0}人のメンバー</Text>
+                </View>
+                <TouchableOpacity onPress={() => deleteGroup(group.id)} style={styles.deleteBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Trash2 size={16} color={Colors.error} />
+                </TouchableOpacity>
+              </TouchableOpacity>
+            ))
+          )}
+
+          {/* フレンドセクション */}
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionLeft}>
+              <Text style={styles.sectionLabel}>フレンド ({friends.length})</Text>
+            </View>
+          </View>
+
+          {friends.length === 0 ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyTitle}>フレンドがいません</Text>
+              <Text style={styles.emptySubtitle}>@IDで友達を検索して申請しましょう</Text>
+              <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/friend/search')}>
+                <Text style={styles.addBtnText}>フレンドを追加</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            friends.map((item, index) => (
+              <View key={item.id}>
+                <TouchableOpacity
+                  style={styles.friendItem}
+                  onPress={() => startChat(item.friend.id)}
+                  activeOpacity={0.7}
+                  disabled={!!startingId}
+                >
+                  <View style={styles.friendLeft}>
+                    <TouchableOpacity onPress={() => router.push(`/profile/${item.friend.id}`)}>
+                      <Avatar
+                        uri={item.friend.avatar_url}
+                        name={item.friend.display_name || item.friend.handle}
+                        size={50}
+                        online={item.friend.is_online}
+                      />
+                    </TouchableOpacity>
+                    <View style={styles.friendInfo}>
+                      <Text style={styles.friendName}>{item.friend.display_name || item.friend.handle}</Text>
+                      <Text style={styles.friendHandle}>@{item.friend.handle}</Text>
+                    </View>
+                  </View>
+                  {startingId === item.friend.id
+                    ? <ActivityIndicator size="small" color={Colors.primary} />
+                    : <View style={styles.chatBtn}><MessageCircle size={20} color={Colors.primary} /></View>}
+                </TouchableOpacity>
+                {index < friends.length - 1 && <View style={styles.separator} />}
+              </View>
+            ))
+          )}
+        </ScrollView>
       )}
+
+      {/* グループ作成モーダル */}
+      <Modal visible={showCreateGroup} animationType="slide" transparent onRequestClose={() => setShowCreateGroup(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>グループを作成</Text>
+              <TouchableOpacity onPress={() => setShowCreateGroup(false)}>
+                <X size={22} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={styles.groupNameInput}
+              placeholder="グループ名を入力"
+              placeholderTextColor={Colors.textMuted}
+              value={groupName}
+              onChangeText={setGroupName}
+              maxLength={30}
+            />
+            <Text style={styles.selectFriendsLabel}>メンバーを選択</Text>
+            <ScrollView style={styles.friendSelectList} showsVerticalScrollIndicator={false}>
+              {friends.map((item) => {
+                const selected = selectedFriendIds.includes(item.friend.id);
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[styles.friendSelectItem, selected && styles.friendSelectItemActive]}
+                    onPress={() => setSelectedFriendIds((p) =>
+                      p.includes(item.friend.id) ? p.filter((x) => x !== item.friend.id) : [...p, item.friend.id]
+                    )}
+                    activeOpacity={0.7}
+                  >
+                    <Avatar uri={item.friend.avatar_url} name={item.friend.display_name || item.friend.handle} size={40} />
+                    <Text style={[styles.friendSelectName, selected && styles.friendSelectNameActive]}>
+                      {item.friend.display_name || item.friend.handle}
+                    </Text>
+                    {selected && <View style={styles.checkMark}><Text style={styles.checkMarkText}>✓</Text></View>}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            <TouchableOpacity
+              style={[styles.createBtn, (!groupName.trim() || creatingGroup) && styles.createBtnDisabled]}
+              onPress={createGroup}
+              disabled={!groupName.trim() || creatingGroup}
+            >
+              {creatingGroup
+                ? <ActivityIndicator size="small" color={Colors.white} />
+                : <Text style={styles.createBtnText}>グループを作成</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* グループ詳細モーダル */}
+      <Modal visible={!!selectedGroup} animationType="slide" transparent onRequestClose={() => setSelectedGroup(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{selectedGroup?.name}</Text>
+              <TouchableOpacity onPress={() => setSelectedGroup(null)}>
+                <X size={22} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.selectFriendsLabel}>
+              メンバー ({selectedGroup?.members?.length ?? 0}人)
+            </Text>
+            <ScrollView style={styles.friendSelectList} showsVerticalScrollIndicator={false}>
+              {(selectedGroup?.members ?? []).map((member) => (
+                <View key={member.id} style={styles.memberItem}>
+                  <Avatar uri={member.avatar_url} name={member.display_name || member.handle} size={44} />
+                  <View style={styles.memberInfo}>
+                    <Text style={styles.memberName}>{member.display_name || member.handle}</Text>
+                    <Text style={styles.memberHandle}>@{member.handle}</Text>
+                  </View>
+                </View>
+              ))}
+              {(selectedGroup?.members ?? []).length === 0 && (
+                <Text style={styles.noMembersText}>メンバーがいません</Text>
+              )}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.deleteGroupBtn}
+              onPress={() => selectedGroup && deleteGroup(selectedGroup.id)}
+            >
+              <Trash2 size={16} color={Colors.error} />
+              <Text style={styles.deleteGroupBtnText}>グループを削除</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -274,69 +424,86 @@ export default function FriendsScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: Colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.separator,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingVertical: 16,
+    backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.separator,
   },
   headerTitle: { fontSize: 22, fontWeight: '800', color: Colors.primary },
   headerActions: { flexDirection: 'row', gap: 8 },
   headerBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 20,
-    backgroundColor: Colors.surface,
-    position: 'relative',
+    width: 40, height: 40, alignItems: 'center', justifyContent: 'center',
+    borderRadius: 20, backgroundColor: Colors.surface, position: 'relative',
   },
   badge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: Colors.error,
-    borderRadius: 8,
-    width: 16,
-    height: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: 'absolute', top: 4, right: 4, backgroundColor: Colors.error,
+    borderRadius: 8, width: 16, height: 16, alignItems: 'center', justifyContent: 'center',
   },
   badgeText: { color: Colors.white, fontSize: 9, fontWeight: '700' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  empty:{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 40 },
+  sectionHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 10, backgroundColor: Colors.surface,
+    borderTopWidth: 1, borderBottomWidth: 1, borderColor: Colors.separator,
+  },
+  sectionLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sectionLabel: { fontSize: 12, fontWeight: '700', color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 1 },
+  createGroupBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: Colors.primary, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5,
+  },
+  createGroupText: { color: Colors.white, fontSize: 12, fontWeight: '600' },
+  groupEmpty: { paddingVertical: 14, paddingHorizontal: 16, backgroundColor: Colors.white },
+  groupEmptyText: { fontSize: 13, color: Colors.textMuted },
+  groupItem: {
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12,
+    backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.separator, gap: 12,
+  },
+  groupIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#E3F2FD', alignItems: 'center', justifyContent: 'center' },
+  groupInfo: { flex: 1 },
+  groupName: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
+  groupMemberCount: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  deleteBtn: { padding: 4 },
+  empty: { alignItems: 'center', gap: 12, paddingHorizontal: 40, paddingVertical: 40 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center' },
   emptySubtitle: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
-  addBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    marginTop: 8,
-  },
+  addBtn: { backgroundColor: Colors.primary, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8 },
   addBtnText: { color: Colors.white, fontWeight: '600', fontSize: 15 },
   friendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: Colors.white,
-    justifyContent: 'space-between',
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12,
+    backgroundColor: Colors.white, justifyContent: 'space-between',
   },
   friendLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   friendInfo: { gap: 2 },
   friendName: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
   friendHandle: { fontSize: 12, color: Colors.textMuted },
-  chatBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  chatBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
   separator: { height: 1, backgroundColor: Colors.separator, marginLeft: 78 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContainer: {
+    backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingTop: 20, paddingHorizontal: 20, paddingBottom: 36, maxHeight: '80%',
+  },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary },
+  groupNameInput: {
+    backgroundColor: Colors.surface, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
+    fontSize: 15, color: Colors.textPrimary, borderWidth: 1, borderColor: Colors.border, marginBottom: 16,
+  },
+  selectFriendsLabel: { fontSize: 12, fontWeight: '700', color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
+  friendSelectList: { maxHeight: 200, marginBottom: 16 },
+  friendSelectItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 8, borderRadius: 12, gap: 12, marginBottom: 2 },
+  friendSelectItemActive: { backgroundColor: '#E3F2FD' },
+  friendSelectName: { flex: 1, fontSize: 15, color: Colors.textPrimary, fontWeight: '500' },
+  friendSelectNameActive: { color: Colors.primary, fontWeight: '600' },
+  checkMark: { width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
+  checkMarkText: { color: Colors.white, fontSize: 13, fontWeight: '700' },
+  createBtn: { backgroundColor: Colors.primary, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
+  createBtnDisabled: { opacity: 0.5 },
+  createBtnText: { color: Colors.white, fontSize: 15, fontWeight: '700' },
+  memberItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12 },
+  memberInfo: { flex: 1 },
+  memberName: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
+  memberHandle: { fontSize: 12, color: Colors.textMuted },
+  noMembersText: { fontSize: 14, color: Colors.textMuted, textAlign: 'center', paddingVertical: 16 },
+  deleteGroupBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 12, backgroundColor: '#FFEBEE', marginTop: 8 },
+  deleteGroupBtnText: { color: Colors.error, fontWeight: '600', fontSize: 14 },
 });

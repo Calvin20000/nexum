@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,29 @@ import {
   Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, Lock, Info, ChevronRight, LogOut } from 'lucide-react-native';
+import { Bell, Lock, Info, ChevronRight, LogOut, Volume2 } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '@/lib/colors';
 import { useAuthStore } from '@/stores/authStore';
+
+export const SOUND_ENABLED_KEY = 'sound_enabled';
 
 export default function SettingsScreen() {
   const { profile, signOut } = useAuthStore();
   const [notifications, setNotifications] = React.useState(true);
   const [messagePreview, setMessagePreview] = React.useState(true);
+  const [soundEnabled, setSoundEnabled] = React.useState(true);
+
+  useEffect(() => {
+    AsyncStorage.getItem(SOUND_ENABLED_KEY).then((val) => {
+      if (val !== null) setSoundEnabled(val === 'true');
+    });
+  }, []);
+
+  const handleSoundToggle = async (value: boolean) => {
+    setSoundEnabled(value);
+    await AsyncStorage.setItem(SOUND_ENABLED_KEY, value ? 'true' : 'false');
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -51,6 +66,21 @@ export default function SettingsScreen() {
             <Switch
               value={messagePreview}
               onValueChange={setMessagePreview}
+              trackColor={{ false: Colors.separator, true: Colors.accent }}
+              thumbColor={Colors.white}
+            />
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <View style={styles.rowLeft}>
+              <View style={[styles.iconBox, { backgroundColor: '#E3F2FD' }]}>
+                <Volume2 size={18} color={Colors.primary} />
+              </View>
+              <Text style={styles.rowLabel}>着信音</Text>
+            </View>
+            <Switch
+              value={soundEnabled}
+              onValueChange={handleSoundToggle}
               trackColor={{ false: Colors.separator, true: Colors.accent }}
               thumbColor={Colors.white}
             />

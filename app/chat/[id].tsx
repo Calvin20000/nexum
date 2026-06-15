@@ -19,6 +19,8 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { ChevronLeft, Send, Image as ImageIcon, Smile, Sticker, Camera, X } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Linking from 'expo-linking';
+import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { uploadImageToStorage, getMimeInfo } from '@/lib/imageUpload';
 import { useAuthStore } from '@/stores/authStore';
@@ -28,6 +30,7 @@ import { EmojiPicker } from '@/components/EmojiPicker';
 import { StickerPicker, Sticker as StickerType } from '@/components/StickerPicker';
 import { Avatar } from '@/components/Avatar';
 import { Colors } from '@/lib/colors';
+import { SOUND_ENABLED_KEY } from '@/app/(tabs)/settings';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const PAGE_SIZE = 50;
@@ -60,6 +63,8 @@ export default function ChatScreen() {
   const [sendingImage, setSendingImage] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
+  const [forwardImageUrl, setForwardImageUrl] = useState<string | null>(null);
+  const [forwardFriends, setForwardFriends] = useState<any[]>([]);
   // On web: position the container to exactly match the visual viewport (handles keyboard + IME bar).
   type WebContainerStyle = { position: 'absolute'; top: number; left: number; right: number; height: number };
   const [webStyle, setWebStyle] = useState<WebContainerStyle | undefined>(() => {
@@ -130,6 +135,71 @@ export default function ChatScreen() {
       return () => window.removeEventListener('resize', update);
     }
   }, []);
+
+  const handleForwardOpen = async (imageUrl: string) => {
+    if (!userId) return;
+    const { data } = await supabase
+      .from('friendships')
+      .select('*')
+      .eq('status', 'accepted')
+      .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`);
+
+    if (data) {
+      const enriched = await Promise.all(
+        data.map(async (f) => {
+          const friendId = f.requester_id === userId ? f.addressee_id : f.requester_id;
+          const { data: user } = await supabase.from('users').select('*').eq('id', friendId).maybeSingle();
+          return { ...f, friend: user };
+        })
+      );
+      setForwardFriends(enriched.filter((f) => f.friend != null));
+    }
+    setForwardImageUrl(imageUrl);
+  };
+
+  const handleForwardToFriend = async (friendId: string) => {
+    if (!userId || !forwardImageUrl) return;
+    const p1 = userId < friendId ? userId : friendId;
+    const p2 = userId < friendId ? friendId : userId;
+
+    let { data: conv } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('participant_1_id', p1)
+      .eq('participant_2_id', p2)
+      .maybeSingle();
+
+    if (!conv) {
+      const { data: created } = await supabase
+        .from('conversations')
+        .insert({ participant_1_id: p1, participant_2_id: p2 })
+        .select('id')
+        .single();
+      conv = created;
+    }
+
+    if (conv) {
+      const { data: msg } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: conv.id,
+          sender_id: userId,
+          message_type: 'image',
+          image_url: forwardImageUrl,
+        })
+        .select()
+        .single();
+
+      if (msg) {
+        supabase.from('conversations').update({ last_message_id: msg.id, last_message_at: msg.created_at }).eq('id', conv.id);
+      }
+    }
+
+    setForwardImageUrl(null);
+    Alert.alert('転送完了', '画像を転送しました。');
+  };
+
+  const handleForwardClose = () => setForwardImageUrl(null);
 
   const fetchData = useCallback(async () => {
     if (!id || !userId) return;
@@ -238,6 +308,14 @@ export default function ChatScreen() {
             if (!senderMap[newMsg.sender_id]) {
               const { data: u } = await supabase.from('users').select('*').eq('id', newMsg.sender_id).maybeSingle();
               if (u) setSenderMap((prev) => ({ ...prev, [u.id]: u }));
+            }
+            if (Platform.OS !== 'web') {
+              const soundOn = await AsyncStorage.getItem(SOUND_ENABLED_KEY);
+              if (soundOn !== 'false') {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              } else {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }
             }
           }
         }
@@ -610,6 +688,7 @@ export default function ChatScreen() {
         sender={sender}
         showAvatar={showAvatar}
         onImagePress={setFullscreenImage}
+        onForward={handleForwardOpen}
       />
     );
   }, [userId, senderMap, messages]);
@@ -840,6 +919,44 @@ export default function ChatScreen() {
           </View>
         </Modal>
       )}
+
+      {/* ── Forward Modal ── */}
+      <Modal
+        visible={!!forwardImageUrl}
+        animationType="slide"
+        onRequestClose={handleForwardClose}
+      >
+        <View style={styles.forwardContainer}>
+          <View style={styles.forwardHeader}>
+            <Text style={styles.forwardTitle}>転送先を選択</Text>
+            <TouchableOpacity onPress={handleForwardClose} style={styles.forwardCloseBtn}>
+              <X size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={forwardFriends}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.forwardFriendItem}
+                onPress={() => handleForwardToFriend(item.friend.id)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.forwardFriendName}>
+                  {item.friend.display_name || item.friend.handle}
+                </Text>
+                <Text style={styles.forwardFriendHandle}>@{item.friend.handle}</Text>
+              </TouchableOpacity>
+            )}
+            ItemSeparatorComponent={() => <View style={styles.forwardSep} />}
+            ListEmptyComponent={
+              <View style={styles.forwardEmpty}>
+                <Text style={styles.forwardEmptyText}>転送できるフレンドがいません</Text>
+              </View>
+            }
+          />
+        </View>
+      </Modal>
 
       {/* ── Fullscreen Image Viewer ── */}
       <Modal
@@ -1117,5 +1234,60 @@ const styles = StyleSheet.create({
   fullscreenImage: {
     width: '100%',
     height: '100%',
+  },
+
+  // Forward Modal
+  forwardContainer: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  forwardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: '#0D47A1',
+    paddingTop: 56,
+  },
+  forwardTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  forwardCloseBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  forwardFriendItem: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: Colors.white,
+    gap: 2,
+  },
+  forwardFriendName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+  },
+  forwardFriendHandle: {
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
+  forwardSep: {
+    height: 1,
+    backgroundColor: Colors.separator,
+    marginLeft: 20,
+  },
+  forwardEmpty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 60,
+  },
+  forwardEmptyText: {
+    fontSize: 15,
+    color: Colors.textSecondary,
   },
 });
