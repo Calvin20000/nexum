@@ -7,15 +7,16 @@ import {
   TouchableOpacity,
   RefreshControl,
   Animated,
-} from 'react-native';import { SafeAreaView } from 'react-native-safe-area-context';
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Edit3, Users } from 'lucide-react-native';
+import { Edit3 } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
-import { ConversationWithUser, GroupConversationWithDetails, UserProfile } from '@/types/database';
+import { ConversationWithUser, UserProfile } from '@/types/database';
+import { useGroupConversations, GroupConversationWithUnread } from '@/hooks/useGroupChat';
 import { ConversationItem } from '@/components/ConversationItem';
-import { Avatar } from '@/components/Avatar';
 import { Colors } from '@/lib/colors';
 import { useColors } from '@/lib/theme';
 
@@ -25,7 +26,7 @@ type ConversationWithUnread = ConversationWithUser & { unread_count: number };
 
 type ChatListItem =
   | { type: 'dm'; data: ConversationWithUnread }
-  | { type: 'group'; data: GroupConversationWithDetails };
+  | { type: 'group'; data: GroupConversationWithUnread };
 
 function formatRelativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -92,42 +93,25 @@ const skeletonStyles = StyleSheet.create({
     backgroundColor: Colors.white,
     gap: 12,
   },
-  avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: Colors.border,
-  },
+  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: Colors.border },
   body: { flex: 1, gap: 8 },
-  lineShort: {
-    height: 14,
-    width: '50%',
-    borderRadius: 7,
-    backgroundColor: Colors.border,
-  },
-  lineLong: {
-    height: 12,
-    width: '80%',
-    borderRadius: 6,
-    backgroundColor: Colors.surface,
-  },
+  lineShort: { height: 14, width: '50%', borderRadius: 7, backgroundColor: Colors.border },
+  lineLong: { height: 12, width: '80%', borderRadius: 6, backgroundColor: Colors.surface },
   meta: { alignItems: 'flex-end', gap: 8 },
-  lineTime: {
-    height: 10,
-    width: 36,
-    borderRadius: 5,
-    backgroundColor: Colors.border,
-  },
+  lineTime: { height: 10, width: 36, borderRadius: 5, backgroundColor: Colors.border },
   sep: { height: 1, backgroundColor: Colors.separator, marginLeft: 80 },
 });
 
 export default function ChatsScreen() {
   const { session } = useAuthStore();
   const C = useColors();
-  const [chatItems, setChatItems] = useState<ChatListItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const userId = session?.user?.id;
+  const [dmItems, setDmItems] = useState<ConversationWithUnread[]>([]);
+  const [dmLoading, setDmLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [previewEnabled, setPreviewEnabled] = useState(true);
+
+  const { groups, loading: groupsLoading, refetch: refetchGroups } = useGroupConversations(userId);
 
   useEffect(() => {
     AsyncStorage.getItem(MESSAGE_PREVIEW_KEY).then((val) => {
@@ -135,18 +119,16 @@ export default function ChatsScreen() {
     });
   }, []);
 
-  const fetchConversations = useCallback(async () => {
-    if (!session?.user) return;
-    const userId = session.user.id;
+  const fetchDMs = useCallback(async () => {
+    if (!userId) return;
 
-    // Fetch 1-on-1 conversations
     const { data: dmData } = await supabase
       .from('conversations')
       .select('*')
       .or(`participant_1_id.eq.${userId},participant_2_id.eq.${userId}`)
       .order('last_message_at', { ascending: false });
 
-    const dmItems: ConversationWithUnread[] = await Promise.all(
+    const items: ConversationWithUnread[] = await Promise.all(
       (dmData ?? []).map(async (conv) => {
         const otherId = conv.participant_1_id === userId ? conv.participant_2_id : conv.participant_1_id;
         const [userRes, msgRes, unreadRes] = await Promise.all([
@@ -169,68 +151,41 @@ export default function ChatsScreen() {
         };
       })
     );
-
-    // Fetch group conversations
-    const { data: gcData } = await (supabase.from('group_conversations' as any) as any)
-      .select('*')
-      .order('last_message_at', { ascending: false, nullsFirst: false });
-
-    const gcItems: GroupConversationWithDetails[] = await Promise.all(
-      ((gcData ?? []) as any[]).map(async (gc: any) => {
-        const { data: memberRows } = await (supabase.from('group_members' as any) as any)
-          .select('user_id')
-          .eq('group_id', gc.id);
-        const memberIds = ((memberRows ?? []) as any[]).map((m: any) => m.user_id);
-        let members: UserProfile[] = [];
-        if (memberIds.length > 0) {
-          const { data: users } = await supabase.from('users').select('*').in('id', memberIds);
-          members = (users ?? []) as UserProfile[];
-        }
-        const { data: lastMsgRow } = await (supabase.from('group_messages' as any) as any)
-          .select('*, sender:users(display_name)')
-          .eq('group_id', gc.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        return { ...gc, members, last_message: lastMsgRow ?? null };
-      })
-    );
-
-    // Merge and sort by last_message_at
-    const allItems: ChatListItem[] = [
-      ...dmItems.filter((c) => c.other_user != null).map((d) => ({ type: 'dm' as const, data: d })),
-      ...gcItems.map((g) => ({ type: 'group' as const, data: g })),
-    ].sort((a, b) => {
-      const aTime = a.data.last_message_at ?? '';
-      const bTime = b.data.last_message_at ?? '';
-      return new Date(bTime).getTime() - new Date(aTime).getTime();
-    });
-
-    setChatItems(allItems);
-    setLoading(false);
+    setDmItems(items.filter((c) => c.other_user != null));
+    setDmLoading(false);
     setRefreshing(false);
-  }, [session]);
+  }, [userId]);
 
   useEffect(() => {
-    fetchConversations();
+    fetchDMs();
 
-    if (!session?.user) return;
+    if (!userId) return;
     const channel = supabase
-      .channel('conversations_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => fetchConversations())
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => fetchConversations())
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, () => fetchConversations())
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages' }, () => fetchConversations())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'group_conversations' }, () => fetchConversations())
+      .channel('dm_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => fetchDMs())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => fetchDMs())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, () => fetchDMs())
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [fetchConversations, session]);
+  }, [fetchDMs, userId]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchConversations();
+    fetchDMs();
+    refetchGroups();
   };
+
+  const chatItems: ChatListItem[] = [
+    ...dmItems.map((d) => ({ type: 'dm' as const, data: d })),
+    ...groups.map((g) => ({ type: 'group' as const, data: g })),
+  ].sort((a, b) => {
+    const aTime = a.data.last_message_at ?? '';
+    const bTime = b.data.last_message_at ?? '';
+    return new Date(bTime).getTime() - new Date(aTime).getTime();
+  });
+
+  const loading = dmLoading || groupsLoading;
 
   if (loading) {
     return (
@@ -247,10 +202,7 @@ export default function ChatsScreen() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <Text style={[styles.headerTitle, { color: C.primary }]}>NEXUM</Text>
-        <TouchableOpacity
-          style={styles.headerBtn}
-          onPress={() => router.push('/chat/new')}
-        >
+        <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/chat/new')}>
           <Edit3 size={22} color={C.primary} />
         </TouchableOpacity>
       </View>
@@ -280,7 +232,7 @@ export default function ChatsScreen() {
                 />
               );
             }
-            // Group chat row
+
             const gc = item.data;
             const lastMsg = gc.last_message as any;
             const senderPrefix = lastMsg?.sender?.display_name ? `${lastMsg.sender.display_name}：` : '';
@@ -302,19 +254,35 @@ export default function ChatsScreen() {
                 onPress={() => router.push(`/group-chat/${gc.id}`)}
                 activeOpacity={0.7}
               >
-                <View style={[gcStyles.avatar, { backgroundColor: '#E3F2FD' }]}>
-                  <Text style={gcStyles.avatarEmoji}>👥</Text>
+                <View style={gcStyles.avatarWrapper}>
+                  <View style={[gcStyles.avatar, { backgroundColor: '#E3F2FD' }]}>
+                    <Text style={gcStyles.avatarEmoji}>👥</Text>
+                  </View>
+                  {gc.unread_count > 0 && (
+                    <View style={gcStyles.unreadBadge}>
+                      <Text style={gcStyles.unreadText}>
+                        {gc.unread_count > 99 ? '99+' : gc.unread_count}
+                      </Text>
+                    </View>
+                  )}
                 </View>
                 <View style={gcStyles.content}>
                   <View style={gcStyles.topRow}>
-                    <Text style={gcStyles.name} numberOfLines={1}>{gc.name}</Text>
-                    <Text style={gcStyles.time}>{gc.last_message_at ? formatRelativeTime(gc.last_message_at) : ''}</Text>
+                    <Text style={[gcStyles.name, gc.unread_count > 0 && gcStyles.nameUnread]} numberOfLines={1}>
+                      {gc.name}
+                    </Text>
+                    <Text style={gcStyles.time}>
+                      {gc.last_message_at ? formatRelativeTime(gc.last_message_at) : ''}
+                    </Text>
                   </View>
                   <View style={gcStyles.bottomRow}>
                     <View style={[gcStyles.memberBadge, { backgroundColor: C.surface }]}>
                       <Text style={[gcStyles.memberBadgeText, { color: C.primary }]}>{gc.members.length}人</Text>
                     </View>
-                    <Text style={gcStyles.preview} numberOfLines={1}>
+                    <Text
+                      style={[gcStyles.preview, gc.unread_count > 0 && gcStyles.previewUnread]}
+                      numberOfLines={1}
+                    >
                       {preview || 'メッセージを送ろう'}
                     </Text>
                   </View>
@@ -324,11 +292,7 @@ export default function ChatsScreen() {
           }}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={C.primary}
-            />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />
           }
         />
       )}
@@ -348,11 +312,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.separator,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    letterSpacing: 2,
-  },
+  headerTitle: { fontSize: 24, fontWeight: '800', letterSpacing: 2 },
   headerBtn: {
     width: 40,
     height: 40,
@@ -361,17 +321,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: Colors.surface,
   },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   separator: { height: 1, backgroundColor: Colors.separator, marginLeft: 80 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 40 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center' },
   emptySubtitle: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
-  startBtn: {
-    borderRadius: 12,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    marginTop: 8,
-  },
+  startBtn: { borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8 },
   startBtnText: { color: Colors.white, fontWeight: '600', fontSize: 15 },
 });
 
@@ -384,6 +338,7 @@ const gcStyles = StyleSheet.create({
     backgroundColor: Colors.white,
     gap: 12,
   },
+  avatarWrapper: { position: 'relative', flexShrink: 0 },
   avatar: {
     width: 52,
     height: 52,
@@ -392,17 +347,29 @@ const gcStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarEmoji: { fontSize: 26 },
+  unreadBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -4,
+    backgroundColor: Colors.error,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: Colors.white,
+  },
+  unreadText: { color: Colors.white, fontSize: 10, fontWeight: '700' },
   content: { flex: 1, gap: 4 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  name: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary, flex: 1 },
+  name: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary, flex: 1 },
+  nameUnread: { fontWeight: '800', color: Colors.textPrimary },
   time: { fontSize: 12, color: Colors.textMuted, marginLeft: 8 },
   bottomRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  memberBadge: {
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    flexShrink: 0,
-  },
+  memberBadge: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, flexShrink: 0 },
   memberBadgeText: { fontSize: 11, fontWeight: '700' },
   preview: { fontSize: 13, color: Colors.textSecondary, flex: 1 },
+  previewUnread: { color: Colors.textPrimary, fontWeight: '600' },
 });

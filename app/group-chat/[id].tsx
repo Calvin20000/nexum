@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,17 +16,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { ChevronLeft, Send, Users, Smile, Sticker } from 'lucide-react-native';
-import * as Haptics from 'expo-haptics';
-import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
-import { GroupConversation, GroupMessage, UserProfile } from '@/types/database';
+import { GroupMessage } from '@/types/database';
+import { useGroupChatMessages } from '@/hooks/useGroupChat';
 import { Avatar } from '@/components/Avatar';
 import { EmojiPicker } from '@/components/EmojiPicker';
 import { StickerPicker, Sticker as StickerType } from '@/components/StickerPicker';
 import { Colors } from '@/lib/colors';
 import { useColors } from '@/lib/theme';
 
-const PAGE_SIZE = 50;
 type PanelType = 'none' | 'emoji' | 'sticker';
 
 function formatTime(iso: string) {
@@ -40,110 +38,21 @@ export default function GroupChatScreen() {
   const C = useColors();
   const userId = session?.user?.id;
 
-  const [groupConv, setGroupConv] = useState<GroupConversation | null>(null);
-  const [members, setMembers] = useState<UserProfile[]>([]);
-  const [messages, setMessages] = useState<GroupMessage[]>([]);
-  const [senderMap, setSenderMap] = useState<Record<string, UserProfile>>({});
+  const {
+    groupConv, members, messages, senderMap,
+    loading, sending, isLoadingMore, hasMore,
+    sendMessage, deleteMessage, loadMore,
+  } = useGroupChatMessages(id as string, userId);
+
   const [text, setText] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
   const [panel, setPanel] = useState<PanelType>('none');
   const [showMembers, setShowMembers] = useState(false);
 
   const flatListRef = useRef<FlatList>(null);
-  const inputRef = useRef<TextInput>(null);
 
   const scrollToBottom = useCallback((animated = true) => {
     flatListRef.current?.scrollToOffset({ offset: 0, animated });
   }, []);
-
-  const fetchData = useCallback(async () => {
-    if (!id || !userId) return;
-
-    const [{ data: gc }, { data: memberRows }, { data: msgs }] = await Promise.all([
-      supabase.from('group_conversations' as any).select('*').eq('id', id).maybeSingle(),
-      supabase.from('group_members' as any).select('user_id').eq('group_id', id),
-      supabase
-        .from('group_messages' as any)
-        .select('*')
-        .eq('group_id', id)
-        .order('created_at', { ascending: false })
-        .limit(PAGE_SIZE),
-    ]);
-
-    setGroupConv(gc as GroupConversation);
-    setHasMore((msgs?.length ?? 0) === PAGE_SIZE);
-
-    const memberIds = ((memberRows ?? []) as any[]).map((m: any) => m.user_id);
-    if (memberIds.length > 0) {
-      const { data: users } = await supabase.from('users').select('*').in('id', memberIds);
-      const memberList = (users ?? []) as UserProfile[];
-      setMembers(memberList);
-      const map: Record<string, UserProfile> = {};
-      memberList.forEach((u) => { map[u.id] = u; });
-      setSenderMap(map);
-    }
-
-    setMessages((msgs ?? []) as GroupMessage[]);
-    setLoading(false);
-  }, [id, userId]);
-
-  const loadMoreMessages = useCallback(async () => {
-    if (!id || !hasMore || isLoadingMore) return;
-    setIsLoadingMore(true);
-
-    const { data } = await supabase
-      .from('group_messages' as any)
-      .select('*')
-      .eq('group_id', id)
-      .order('created_at', { ascending: false })
-      .range(messages.length, messages.length + PAGE_SIZE - 1);
-
-    if (data && data.length > 0) {
-      setMessages((prev) => [...prev, ...(data as GroupMessage[])]);
-      setHasMore(data.length === PAGE_SIZE);
-    } else {
-      setHasMore(false);
-    }
-    setIsLoadingMore(false);
-  }, [id, hasMore, isLoadingMore, messages.length]);
-
-  useEffect(() => {
-    fetchData();
-
-    const channel = supabase
-      .channel(`group_conv_${id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_id=eq.${id}` },
-        async (payload) => {
-          const newMsg = payload.new as GroupMessage;
-          setMessages((prev) => prev.find((m) => m.id === newMsg.id) ? prev : [newMsg, ...prev]);
-          if (newMsg.sender_id !== userId) {
-            if (!senderMap[newMsg.sender_id]) {
-              const { data: u } = await supabase.from('users').select('*').eq('id', newMsg.sender_id).maybeSingle();
-              if (u) setSenderMap((prev) => ({ ...prev, [(u as UserProfile).id]: u as UserProfile }));
-            }
-            if (Platform.OS !== 'web') {
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            }
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'group_messages', filter: `group_id=eq.${id}` },
-        (payload) => {
-          const updated = payload.new as GroupMessage;
-          setMessages((prev) => prev.map((m) => m.id === updated.id ? updated : m));
-        }
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [fetchData, id, userId]);
 
   const openPanel = (type: PanelType) => {
     Keyboard.dismiss();
@@ -152,78 +61,24 @@ export default function GroupChatScreen() {
 
   const closePanel = () => setPanel('none');
 
-  const makeTempMessage = (overrides: Partial<GroupMessage> & { message_type: GroupMessage['message_type'] }): GroupMessage => ({
-    id: `temp_${Date.now()}_${Math.random()}`,
-    group_id: id as string,
-    sender_id: userId!,
-    content: null,
-    image_url: null,
-    is_deleted: false,
-    reply_to_id: null,
-    created_at: new Date().toISOString(),
-    ...overrides,
-  });
-
-  const resolveTemp = (tempId: string, real: GroupMessage) => {
-    setMessages((prev) =>
-      prev.some((m) => m.id === real.id)
-        ? prev.filter((m) => m.id !== tempId)
-        : prev.map((m) => m.id === tempId ? real : m)
-    );
-  };
-
-  const sendMessage = async (content: string, type: GroupMessage['message_type'] = 'text') => {
-    if (!content.trim() || !userId || !id || sending) return;
-    setSending(true);
-
-    const temp = makeTempMessage({ message_type: type, content: content.trim() });
-    setMessages((prev) => [temp, ...prev]);
-    scrollToBottom();
-
-    const { data: msg, error } = await (supabase.from('group_messages' as any) as any)
-      .insert({
-        group_id: id,
-        sender_id: userId,
-        message_type: type,
-        content: content.trim(),
-      })
-      .select()
-      .single();
-
-    if (!error && msg) {
-      resolveTemp(temp.id, msg as GroupMessage);
-      (supabase.from('group_conversations' as any) as any)
-        .update({ last_message_at: (msg as GroupMessage).created_at })
-        .eq('id', id);
-    } else {
-      setMessages((prev) => prev.filter((m) => m.id !== temp.id));
-    }
-    setSending(false);
-  };
-
   const handleSend = async () => {
     const content = text;
     setText('');
     await sendMessage(content);
+    scrollToBottom();
   };
 
   const handleStickerSelect = async (sticker: StickerType) => {
     closePanel();
     await sendMessage(sticker.emoji, 'sticker');
+    scrollToBottom();
   };
 
   const handleDeleteMessage = (msg: GroupMessage) => {
     if (msg.sender_id !== userId) return;
     Alert.alert('メッセージを削除', '削除しますか？', [
       { text: 'キャンセル', style: 'cancel' },
-      {
-        text: '削除', style: 'destructive',
-        onPress: () => {
-          (supabase.from('group_messages' as any) as any)
-            .update({ is_deleted: true })
-            .eq('id', msg.id);
-        },
-      },
+      { text: '削除', style: 'destructive', onPress: () => deleteMessage(msg.id) },
     ]);
   };
 
@@ -303,10 +158,7 @@ export default function GroupChatScreen() {
               {sender?.display_name || sender?.handle}
             </Text>
           )}
-          <TouchableOpacity
-            onLongPress={() => handleDeleteMessage(item)}
-            activeOpacity={0.85}
-          >
+          <TouchableOpacity onLongPress={() => handleDeleteMessage(item)} activeOpacity={0.85}>
             <View style={[
               styles.bubble,
               isOwn ? [styles.bubbleOwn, { backgroundColor: C.primary }] : styles.bubbleOther,
@@ -336,7 +188,6 @@ export default function GroupChatScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <ChevronLeft size={26} color={C.primary} />
@@ -357,7 +208,6 @@ export default function GroupChatScreen() {
         <View style={styles.headerRight} />
       </View>
 
-      {/* Members panel */}
       {showMembers && (
         <View style={[styles.membersPanel, { borderColor: C.border }]}>
           <Text style={[styles.membersPanelTitle, { color: C.primary }]}>メンバー</Text>
@@ -392,10 +242,12 @@ export default function GroupChatScreen() {
           contentContainerStyle={styles.messageList}
           keyboardShouldPersistTaps="handled"
           onScrollBeginDrag={closePanel}
-          onEndReached={loadMoreMessages}
+          onEndReached={loadMore}
           onEndReachedThreshold={0.3}
           ListFooterComponent={
-            isLoadingMore ? <ActivityIndicator size="small" color={C.primary} style={{ marginVertical: 8 }} /> : null
+            isLoadingMore
+              ? <ActivityIndicator size="small" color={C.primary} style={{ marginVertical: 8 }} />
+              : null
           }
           ListEmptyComponent={
             <View style={styles.emptyChat}>
@@ -422,7 +274,6 @@ export default function GroupChatScreen() {
           </TouchableOpacity>
 
           <TextInput
-            ref={inputRef}
             style={styles.textInput}
             placeholder="メッセージを入力..."
             placeholderTextColor={Colors.textMuted}
@@ -499,12 +350,7 @@ const styles = StyleSheet.create({
   msgRowOther: { justifyContent: 'flex-start' },
   msgColumn: { maxWidth: '72%', gap: 2 },
   senderName: { fontSize: 11, fontWeight: '600', marginLeft: 2, marginBottom: 1 },
-  bubble: {
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    maxWidth: '100%',
-  },
+  bubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 9, maxWidth: '100%' },
   bubbleOwn: { borderBottomRightRadius: 4 },
   bubbleOther: {
     backgroundColor: Colors.white,
