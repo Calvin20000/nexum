@@ -199,3 +199,28 @@ export type ConversationWithUser = Conversation & {
 };
 
 export type ProfilePhoto = Database['public']['Tables']['profile_photos']['Row'];
+
+export interface GroupChat {
+  id: string;
+  name: string;
+  created_by: string;
+  last_message_at: string;
+  created_at: string;
+}
+
+export interface GroupChatMessage {
+  id: string;
+  group_chat_id: string;
+  sender_id: string;
+  content: string | null;
+  message_type: 'text' | 'image' | 'sticker';
+  image_url: string | null;
+  is_deleted: boolean;
+  reply_to_id: string | null;
+  created_at: string;
+}
+
+export type GroupChatWithDetails = GroupChat & {
+  members: UserProfile[];
+  last_message?: GroupChatMessage | null;
+};

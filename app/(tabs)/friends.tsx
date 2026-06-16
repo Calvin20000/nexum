@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { UserPlus, Bell, MessageCircle, Users, Plus, X, Trash2, UserMinus } from 'lucide-react-native';
+import { UserPlus, Bell, MessageCircle, Users, Plus, X, Trash2, UserMinus, MessagesSquare } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
 import { Friendship, UserProfile } from '@/types/database';
@@ -258,6 +258,39 @@ export default function FriendsScreen() {
         },
       },
     ]);
+  };
+
+  const startGroupChat = async (group: FriendGroup) => {
+    if (!session?.user) return;
+    const userId = session.user.id;
+
+    // Check if a group chat already exists for this friend_group
+    // We use group name + created_by as identifier, then navigate
+    // Create a new group chat with the group's members
+    const memberIds = (group.members ?? []).map((m) => m.id);
+    if (memberIds.length === 0) {
+      Alert.alert('メンバーがいません', 'グループにメンバーを追加してからチャットを開始してください。');
+      return;
+    }
+
+    const { data: gc, error } = await (supabase.from('group_chats' as any) as any)
+      .insert({ name: group.name, created_by: userId })
+      .select()
+      .single();
+
+    if (error || !gc) {
+      Alert.alert('エラー', 'グループチャットの作成に失敗しました。');
+      return;
+    }
+
+    // Add creator + all members
+    const allIds = [...new Set([userId, ...memberIds])];
+    await (supabase.from('group_chat_members' as any) as any).insert(
+      allIds.map((uid) => ({ group_chat_id: (gc as any).id, user_id: uid }))
+    );
+
+    setSelectedGroup(null);
+    router.push(`/group-chat/${(gc as any).id}`);
   };
 
   const startChat = async (friendId: string) => {
@@ -555,11 +588,19 @@ export default function FriendsScreen() {
                 </ScrollView>
 
                 <TouchableOpacity
-                  style={[styles.addMemberBtn, { backgroundColor: C.primary }]}
+                  style={[styles.startGroupChatBtn, { backgroundColor: C.primary }]}
+                  onPress={() => selectedGroup && startGroupChat(selectedGroup)}
+                >
+                  <MessagesSquare size={16} color={Colors.white} />
+                  <Text style={styles.startGroupChatBtnText}>グループチャットを開始</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.addMemberBtn, { borderColor: C.primary }]}
                   onPress={() => setShowAddMemberModal(true)}
                 >
-                  <Plus size={16} color={Colors.white} />
-                  <Text style={styles.addMemberBtnText}>メンバーを追加</Text>
+                  <Plus size={16} color={C.primary} />
+                  <Text style={[styles.addMemberBtnText, { color: C.primary }]}>メンバーを追加</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -704,8 +745,14 @@ const styles = StyleSheet.create({
   addMemberBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 6, borderRadius: 12, paddingVertical: 12, marginBottom: 8,
+    borderWidth: 1.5,
   },
-  addMemberBtnText: { color: Colors.white, fontWeight: '600', fontSize: 15 },
+  addMemberBtnText: { fontWeight: '600', fontSize: 15 },
+  startGroupChatBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, borderRadius: 12, paddingVertical: 13, marginBottom: 8,
+  },
+  startGroupChatBtnText: { color: Colors.white, fontWeight: '700', fontSize: 15 },
   addMemberHeader: { marginBottom: 8 },
   backArrowBtn: { marginBottom: 6 },
   backArrowText: { fontSize: 14, fontWeight: '600' },
