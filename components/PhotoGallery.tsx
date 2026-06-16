@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,10 +10,10 @@ import {
   ActivityIndicator,
   Dimensions,
   TextInput,
-  ScrollView,
+  FlatList,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { X, Plus } from 'lucide-react-native';
+import { X, Plus, Trash2, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { uploadImageToStorage } from '@/lib/imageUpload';
 import { Colors } from '@/lib/colors';
@@ -30,15 +30,16 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 export function PhotoGallery({ userId, isOwner }: Props) {
   const C = useColors();
   const [photos, setPhotos] = useState<ProfilePhoto[]>([]);
-  const [selectedPhoto, setSelectedPhoto] = useState<ProfilePhoto | null>(null);
   const [uploading, setUploading] = useState(false);
   // Caption flow: shown after image is picked, before upload
   const [pendingUri, setPendingUri] = useState<string | null>(null);
   const [pendingMime, setPendingMime] = useState('image/jpeg');
   const [captionInput, setCaptionInput] = useState('');
-  // Editing caption on existing photo
+  // Slideshow viewer
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [editingCaption, setEditingCaption] = useState(false);
   const [editCaptionText, setEditCaptionText] = useState('');
+  const flatListRef = useRef<FlatList<ProfilePhoto>>(null);
 
   const fetchPhotos = async () => {
     const { data } = await supabase
@@ -110,37 +111,56 @@ export function PhotoGallery({ userId, isOwner }: Props) {
         style: 'destructive',
         onPress: async () => {
           await supabase.from('profile_photos').delete().eq('id', photoId);
-          setSelectedPhoto(null);
-          fetchPhotos();
+          const newPhotos = photos.filter((p) => p.id !== photoId);
+          setPhotos(newPhotos);
+          if (newPhotos.length === 0) {
+            setViewerIndex(null);
+          } else if (viewerIndex !== null) {
+            const newIndex = Math.min(viewerIndex, newPhotos.length - 1);
+            setViewerIndex(newIndex);
+          }
+          setEditingCaption(false);
         },
       },
     ]);
   };
 
   const saveCaption = async () => {
-    if (!selectedPhoto) return;
+    if (viewerIndex === null) return;
+    const photo = photos[viewerIndex];
     await supabase
       .from('profile_photos')
       .update({ caption: editCaptionText.trim() || null })
-      .eq('id', selectedPhoto.id);
-    setSelectedPhoto((p) => p ? { ...p, caption: editCaptionText.trim() || null } : p);
-    setPhotos((prev) =>
-      prev.map((ph) =>
-        ph.id === selectedPhoto.id ? { ...ph, caption: editCaptionText.trim() || null } : ph
-      )
-    );
+      .eq('id', photo.id);
+    const updated = { ...photo, caption: editCaptionText.trim() || null };
+    setPhotos((prev) => prev.map((p) => (p.id === photo.id ? updated : p)));
     setEditingCaption(false);
   };
+
+  const openViewer = (index: number) => {
+    setViewerIndex(index);
+    setEditingCaption(false);
+    setTimeout(() => {
+      flatListRef.current?.scrollToIndex({ index, animated: false });
+    }, 50);
+  };
+
+  const currentPhoto = viewerIndex !== null ? photos[viewerIndex] : null;
+
+  const renderSlide = ({ item, index }: { item: ProfilePhoto; index: number }) => (
+    <View style={styles.slide}>
+      <Image source={{ uri: item.photo_url }} style={styles.fullPhoto} resizeMode="contain" />
+    </View>
+  );
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>フォト</Text>
       <View style={styles.grid}>
-        {photos.map((photo) => (
+        {photos.map((photo, index) => (
           <TouchableOpacity
             key={photo.id}
-            onPress={() => setSelectedPhoto(photo)}
-            onLongPress={() => isOwner && deletePhoto(photo.id)}
+            onPress={() => openViewer(index)}
             style={styles.photoItem}
             activeOpacity={0.85}
           >
@@ -204,78 +224,124 @@ export function PhotoGallery({ userId, isOwner }: Props) {
         </View>
       </Modal>
 
-      {/* Fullscreen photo viewer */}
+      {/* Slideshow viewer */}
       <Modal
-        visible={!!selectedPhoto}
+        visible={viewerIndex !== null}
         transparent
         animationType="fade"
-        onRequestClose={() => { setSelectedPhoto(null); setEditingCaption(false); }}
+        onRequestClose={() => { setViewerIndex(null); setEditingCaption(false); }}
       >
         <View style={styles.modal}>
           <TouchableOpacity
             style={styles.closeButton}
-            onPress={() => { setSelectedPhoto(null); setEditingCaption(false); }}
+            onPress={() => { setViewerIndex(null); setEditingCaption(false); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <X size={22} color="#FFFFFF" />
           </TouchableOpacity>
 
-          {selectedPhoto && (
-            <>
-              <Image
-                source={{ uri: selectedPhoto.photo_url }}
-                style={styles.fullPhoto}
-                resizeMode="contain"
-              />
+          {/* Photo counter */}
+          {photos.length > 1 && viewerIndex !== null && (
+            <View style={styles.counter}>
+              <Text style={styles.counterText}>{viewerIndex + 1} / {photos.length}</Text>
+            </View>
+          )}
 
-              {/* Caption display / edit */}
-              <View style={styles.captionArea}>
-                {editingCaption ? (
-                  <View style={styles.captionEditRow}>
-                    <TextInput
-                      style={styles.captionEditInput}
-                      value={editCaptionText}
-                      onChangeText={setEditCaptionText}
-                      placeholder="コメントを入力"
-                      placeholderTextColor="rgba(255,255,255,0.5)"
-                      maxLength={100}
-                      multiline
-                      autoFocus
-                    />
-                    <TouchableOpacity
-                      style={[styles.captionSaveBtn, { backgroundColor: C.primary }]}
-                      onPress={saveCaption}
-                    >
-                      <Text style={styles.captionSaveBtnText}>保存</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    onPress={() => {
-                      if (!isOwner) return;
-                      setEditCaptionText(selectedPhoto.caption ?? '');
-                      setEditingCaption(true);
-                    }}
-                    activeOpacity={isOwner ? 0.7 : 1}
-                  >
-                    {selectedPhoto.caption ? (
-                      <Text style={styles.captionText}>{selectedPhoto.caption}</Text>
-                    ) : isOwner ? (
-                      <Text style={styles.captionPlaceholder}>コメントを追加する</Text>
-                    ) : null}
-                  </TouchableOpacity>
-                )}
-              </View>
+          {/* Horizontal paging FlatList */}
+          <FlatList
+            ref={flatListRef}
+            data={photos}
+            keyExtractor={(p) => p.id}
+            renderItem={renderSlide}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(e) => {
+              const newIndex = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+              if (newIndex !== viewerIndex) {
+                setViewerIndex(newIndex);
+                setEditingCaption(false);
+              }
+            }}
+            getItemLayout={(_, index) => ({ length: SCREEN_WIDTH, offset: SCREEN_WIDTH * index, index })}
+            initialScrollIndex={viewerIndex ?? 0}
+          />
 
-              {isOwner && !editingCaption && (
+          {/* Prev/Next arrows */}
+          {viewerIndex !== null && viewerIndex > 0 && (
+            <TouchableOpacity
+              style={[styles.arrowBtn, styles.arrowLeft]}
+              onPress={() => {
+                const newIdx = viewerIndex - 1;
+                flatListRef.current?.scrollToIndex({ index: newIdx, animated: true });
+                setViewerIndex(newIdx);
+                setEditingCaption(false);
+              }}
+            >
+              <ChevronLeft size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
+          {viewerIndex !== null && viewerIndex < photos.length - 1 && (
+            <TouchableOpacity
+              style={[styles.arrowBtn, styles.arrowRight]}
+              onPress={() => {
+                const newIdx = viewerIndex + 1;
+                flatListRef.current?.scrollToIndex({ index: newIdx, animated: true });
+                setViewerIndex(newIdx);
+                setEditingCaption(false);
+              }}
+            >
+              <ChevronRight size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
+
+          {/* Caption display / edit */}
+          <View style={styles.captionArea}>
+            {editingCaption ? (
+              <View style={styles.captionEditRow}>
+                <TextInput
+                  style={styles.captionEditInput}
+                  value={editCaptionText}
+                  onChangeText={setEditCaptionText}
+                  placeholder="コメントを入力"
+                  placeholderTextColor="rgba(255,255,255,0.5)"
+                  maxLength={100}
+                  multiline
+                  autoFocus
+                />
                 <TouchableOpacity
-                  style={styles.deleteBtn}
-                  onPress={() => deletePhoto(selectedPhoto.id)}
+                  style={[styles.captionSaveBtn, { backgroundColor: C.primary }]}
+                  onPress={saveCaption}
                 >
-                  <Text style={styles.deleteBtnText}>削除</Text>
+                  <Text style={styles.captionSaveBtnText}>保存</Text>
                 </TouchableOpacity>
-              )}
-            </>
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={() => {
+                  if (!isOwner || !currentPhoto) return;
+                  setEditCaptionText(currentPhoto.caption ?? '');
+                  setEditingCaption(true);
+                }}
+                activeOpacity={isOwner ? 0.7 : 1}
+              >
+                {currentPhoto?.caption ? (
+                  <Text style={styles.captionText}>{currentPhoto.caption}</Text>
+                ) : isOwner ? (
+                  <Text style={styles.captionPlaceholder}>コメントを追加する</Text>
+                ) : null}
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {isOwner && !editingCaption && currentPhoto && (
+            <TouchableOpacity
+              style={styles.deleteBtn}
+              onPress={() => deletePhoto(currentPhoto.id)}
+            >
+              <Trash2 size={16} color="#FFFFFF" />
+              <Text style={styles.deleteBtnText}>削除</Text>
+            </TouchableOpacity>
           )}
         </View>
       </Modal>
@@ -341,7 +407,7 @@ const styles = StyleSheet.create({
   },
   modal: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.92)',
+    backgroundColor: 'rgba(0,0,0,0.95)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -357,10 +423,45 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  counter: {
+    position: 'absolute',
+    top: 58,
+    alignSelf: 'center',
+    zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  counterText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  slide: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_WIDTH,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   fullPhoto: {
     width: SCREEN_WIDTH,
     height: SCREEN_WIDTH,
   },
+  arrowBtn: {
+    position: 'absolute',
+    top: '50%',
+    marginTop: -22,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  arrowLeft: { left: 12 },
+  arrowRight: { right: 12 },
   captionArea: {
     paddingHorizontal: 24,
     paddingTop: 12,
@@ -404,8 +505,11 @@ const styles = StyleSheet.create({
   deleteBtn: {
     position: 'absolute',
     bottom: 60,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     backgroundColor: 'rgba(211,47,47,0.9)',
-    paddingHorizontal: 28,
+    paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,
   },

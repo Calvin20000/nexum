@@ -6,9 +6,10 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, Lock, Info, ChevronRight, LogOut, Volume2, Vibrate, MessageSquare, Palette } from 'lucide-react-native';
+import { Bell, Lock, Info, ChevronRight, LogOut, Volume2, Vibrate, MessageSquare, Palette, X, Check } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '@/lib/colors';
 import { useAuthStore } from '@/stores/authStore';
@@ -17,6 +18,18 @@ import { useTheme, THEME_COLORS } from '@/lib/theme';
 export const SOUND_ENABLED_KEY = 'sound_enabled';
 export const VIBRATE_ENABLED_KEY = 'vibrate_enabled';
 export const MESSAGE_PREVIEW_KEY = 'message_preview_enabled';
+export const SELECTED_SOUND_KEY = 'selected_sound';
+
+const SOUND_OPTIONS = [
+  { id: 'default', label: 'デフォルト' },
+  { id: 'chime', label: 'チャイム' },
+  { id: 'pop', label: 'ポップ' },
+  { id: 'bubble', label: 'バブル' },
+  { id: 'crystal', label: 'クリスタル' },
+  { id: 'silent', label: 'サイレント' },
+] as const;
+
+type SoundId = typeof SOUND_OPTIONS[number]['id'];
 
 export default function SettingsScreen() {
   const { profile, signOut } = useAuthStore();
@@ -25,6 +38,8 @@ export default function SettingsScreen() {
   const [messagePreview, setMessagePreview] = React.useState(true);
   const [soundEnabled, setSoundEnabled] = React.useState(true);
   const [vibrateEnabled, setVibrateEnabled] = React.useState(true);
+  const [selectedSound, setSelectedSound] = React.useState<SoundId>('default');
+  const [showSoundModal, setShowSoundModal] = React.useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem(SOUND_ENABLED_KEY).then((val) => {
@@ -35,6 +50,9 @@ export default function SettingsScreen() {
     });
     AsyncStorage.getItem(MESSAGE_PREVIEW_KEY).then((val) => {
       if (val !== null) setMessagePreview(val !== 'false');
+    });
+    AsyncStorage.getItem(SELECTED_SOUND_KEY).then((val) => {
+      if (val) setSelectedSound(val as SoundId);
     });
   }, []);
 
@@ -52,6 +70,14 @@ export default function SettingsScreen() {
     setMessagePreview(value);
     await AsyncStorage.setItem(MESSAGE_PREVIEW_KEY, value ? 'true' : 'false');
   };
+
+  const handleSelectSound = async (id: SoundId) => {
+    setSelectedSound(id);
+    await AsyncStorage.setItem(SELECTED_SOUND_KEY, id);
+    setShowSoundModal(false);
+  };
+
+  const soundLabel = SOUND_OPTIONS.find((o) => o.id === selectedSound)?.label ?? 'デフォルト';
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -77,20 +103,18 @@ export default function SettingsScreen() {
             />
           </View>
           <View style={styles.divider} />
-          <View style={styles.row}>
+          <TouchableOpacity style={styles.row} onPress={() => setShowSoundModal(true)}>
             <View style={styles.rowLeft}>
               <View style={[styles.iconBox, { backgroundColor: '#E3F2FD' }]}>
                 <Volume2 size={18} color={primaryColor} />
               </View>
-              <Text style={styles.rowLabel}>着信音</Text>
+              <View>
+                <Text style={styles.rowLabel}>着信音</Text>
+                <Text style={styles.rowSub}>{soundLabel}</Text>
+              </View>
             </View>
-            <Switch
-              value={soundEnabled}
-              onValueChange={handleSoundToggle}
-              trackColor={{ false: Colors.separator, true: primaryColor }}
-              thumbColor={Colors.white}
-            />
-          </View>
+            <ChevronRight size={18} color={Colors.textMuted} />
+          </TouchableOpacity>
           <View style={styles.divider} />
           <View style={styles.row}>
             <View style={styles.rowLeft}>
@@ -204,6 +228,38 @@ export default function SettingsScreen() {
           <Text style={styles.logoutText}>ログアウト</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* 着信音選択モーダル */}
+      <Modal visible={showSoundModal} transparent animationType="slide" onRequestClose={() => setShowSoundModal(false)}>
+        <View style={styles.soundModalOverlay}>
+          <View style={styles.soundModalBox}>
+            <View style={styles.soundModalHeader}>
+              <Text style={styles.soundModalTitle}>着信音を選択</Text>
+              <TouchableOpacity onPress={() => setShowSoundModal(false)}>
+                <X size={22} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            {SOUND_OPTIONS.map((option, index) => {
+              const isSelected = selectedSound === option.id;
+              return (
+                <React.Fragment key={option.id}>
+                  {index > 0 && <View style={styles.soundDivider} />}
+                  <TouchableOpacity
+                    style={styles.soundOption}
+                    onPress={() => handleSelectSound(option.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.soundOptionLabel, isSelected && { color: primaryColor, fontWeight: '700' }]}>
+                      {option.label}
+                    </Text>
+                    {isSelected && <Check size={18} color={primaryColor} />}
+                  </TouchableOpacity>
+                </React.Fragment>
+              );
+            })}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -311,4 +367,28 @@ const styles = StyleSheet.create({
     borderColor: '#FFCDD2',
   },
   logoutText: { color: Colors.error, fontWeight: '600', fontSize: 15 },
+  soundModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  soundModalBox: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  soundModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  soundModalTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary },
+  soundOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+  },
+  soundOptionLabel: { fontSize: 16, color: Colors.textPrimary },
+  soundDivider: { height: 1, backgroundColor: Colors.separator },
 });

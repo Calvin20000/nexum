@@ -106,6 +106,11 @@ export default function FriendsScreen() {
   // Add member to existing group (from detail modal)
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
 
+  // Group message modal
+  const [showGroupMessage, setShowGroupMessage] = useState(false);
+  const [groupMessageText, setGroupMessageText] = useState('');
+  const [sendingGroupMessage, setSendingGroupMessage] = useState(false);
+
   const fetchFriends = useCallback(async () => {
     if (!session?.user) return;
     const userId = session.user.id;
@@ -291,6 +296,50 @@ export default function FriendsScreen() {
 
     setSelectedGroup(null);
     router.push(`/group-chat/${(gc as any).id}`);
+  };
+
+  const sendMessageToGroup = async () => {
+    if (!session?.user || !selectedGroup || !groupMessageText.trim()) return;
+    setSendingGroupMessage(true);
+    const userId = session.user.id;
+    const members = selectedGroup.members ?? [];
+
+    await Promise.all(
+      members
+        .filter((m) => m.id !== userId)
+        .map(async (member) => {
+          const p1 = userId < member.id ? userId : member.id;
+          const p2 = userId < member.id ? member.id : userId;
+          let { data: conv } = await supabase
+            .from('conversations')
+            .select('id')
+            .eq('participant_1_id', p1)
+            .eq('participant_2_id', p2)
+            .maybeSingle();
+          if (!conv) {
+            const { data: created } = await supabase
+              .from('conversations')
+              .insert({ participant_1_id: p1, participant_2_id: p2 })
+              .select('id')
+              .single();
+            conv = created;
+          }
+          if (conv) {
+            await supabase.from('messages').insert({
+              conversation_id: (conv as any).id,
+              sender_id: userId,
+              message_type: 'text',
+              content: groupMessageText.trim(),
+            });
+          }
+        })
+    );
+
+    setSendingGroupMessage(false);
+    setShowGroupMessage(false);
+    setGroupMessageText('');
+    setSelectedGroup(null);
+    Alert.alert('送信完了', `${members.filter((m) => m.id !== userId).length}人のメンバーにメッセージを送りました。`);
   };
 
   const startChat = async (friendId: string) => {
@@ -596,6 +645,14 @@ export default function FriendsScreen() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
+                  style={[styles.sendAllMsgBtn, { borderColor: C.primary }]}
+                  onPress={() => setShowGroupMessage(true)}
+                >
+                  <MessageCircle size={16} color={C.primary} />
+                  <Text style={[styles.sendAllMsgBtnText, { color: C.primary }]}>全員にメッセージ</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
                   style={[styles.addMemberBtn, { borderColor: C.primary }]}
                   onPress={() => setShowAddMemberModal(true)}
                 >
@@ -653,6 +710,41 @@ export default function FriendsScreen() {
                 </ScrollView>
               </>
             )}
+          </View>
+        </View>
+      </Modal>
+      {/* グループメッセージモーダル */}
+      <Modal visible={showGroupMessage} transparent animationType="slide" onRequestClose={() => setShowGroupMessage(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>全員にメッセージ</Text>
+              <TouchableOpacity onPress={() => setShowGroupMessage(false)}>
+                <X size={22} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.groupMsgSubtitle}>
+              {selectedGroup?.name} のメンバー全員に個別DMを送ります
+            </Text>
+            <TextInput
+              style={styles.groupMsgInput}
+              placeholder="メッセージを入力..."
+              placeholderTextColor={Colors.textMuted}
+              value={groupMessageText}
+              onChangeText={setGroupMessageText}
+              maxLength={500}
+              multiline
+              autoFocus
+            />
+            <TouchableOpacity
+              style={[styles.createBtn, { backgroundColor: C.primary }, (!groupMessageText.trim() || sendingGroupMessage) && styles.createBtnDisabled]}
+              onPress={sendMessageToGroup}
+              disabled={!groupMessageText.trim() || sendingGroupMessage}
+            >
+              {sendingGroupMessage
+                ? <ActivityIndicator size="small" color={Colors.white} />
+                : <Text style={styles.createBtnText}>送信する</Text>}
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -758,6 +850,18 @@ const styles = StyleSheet.create({
   backArrowText: { fontSize: 14, fontWeight: '600' },
   deleteGroupBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 12, backgroundColor: '#FFEBEE', marginTop: 4 },
   deleteGroupBtnText: { color: Colors.error, fontWeight: '600', fontSize: 14 },
+  sendAllMsgBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, borderRadius: 12, paddingVertical: 12, marginBottom: 8,
+    borderWidth: 1.5,
+  },
+  sendAllMsgBtnText: { fontWeight: '600', fontSize: 15 },
+  groupMsgSubtitle: { fontSize: 13, color: Colors.textSecondary, marginBottom: 14, lineHeight: 18 },
+  groupMsgInput: {
+    backgroundColor: Colors.surface, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
+    fontSize: 15, color: Colors.textPrimary, borderWidth: 1, borderColor: Colors.border,
+    minHeight: 100, maxHeight: 200, marginBottom: 16, textAlignVertical: 'top',
+  },
   // Long-press action menu
   actionMenuContainer: {
     backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24,

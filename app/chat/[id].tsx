@@ -14,6 +14,7 @@ import {
   Alert,
   Image,
   Clipboard,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -71,6 +72,21 @@ export default function ChatScreen() {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [actionMessage, setActionMessage] = useState<Message | null>(null);
   const [replyCache, setReplyCache] = useState<Record<string, Message>>({});
+  // New message banner
+  const [bannerMsg, setBannerMsg] = useState<{ senderName: string; preview: string } | null>(null);
+  const bannerAnim = useRef(new Animated.Value(-80)).current;
+  const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showBanner = useCallback((senderName: string, preview: string) => {
+    if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+    setBannerMsg({ senderName, preview });
+    Animated.spring(bannerAnim, { toValue: 0, useNativeDriver: true, speed: 20, bounciness: 4 }).start();
+    bannerTimerRef.current = setTimeout(() => {
+      Animated.timing(bannerAnim, { toValue: -80, duration: 280, useNativeDriver: true }).start(() => {
+        setBannerMsg(null);
+      });
+    }, 3000);
+  }, [bannerAnim]);
   // On web: position the container to exactly match the visual viewport (handles keyboard + IME bar).
   type WebContainerStyle = { position: 'absolute'; top: number; left: number; right: number; height: number };
   const [webStyle, setWebStyle] = useState<WebContainerStyle | undefined>(() => {
@@ -341,6 +357,13 @@ export default function ChatScreen() {
               const { data: u } = await supabase.from('users').select('*').eq('id', newMsg.sender_id).maybeSingle();
               if (u) setSenderMap((prev) => ({ ...prev, [u.id]: u }));
             }
+            // Show in-chat banner
+            const sender = senderMap[newMsg.sender_id] ?? otherUser;
+            const senderName = sender?.display_name || sender?.handle || '...';
+            const preview = newMsg.message_type === 'text'
+              ? (newMsg.content ?? '').substring(0, 40)
+              : newMsg.message_type === 'image' ? '写真' : 'スタンプ';
+            showBanner(senderName, preview);
             if (Platform.OS !== 'web') {
               const [soundVal, vibrateVal] = await Promise.all([
                 AsyncStorage.getItem(SOUND_ENABLED_KEY),
@@ -807,6 +830,32 @@ export default function ChatScreen() {
           <View style={styles.headerRight} />
         </View>
 
+        {/* New message banner */}
+        {bannerMsg && (
+          <Animated.View
+            style={[styles.banner, { transform: [{ translateY: bannerAnim }] }]}
+          >
+            <TouchableOpacity
+              style={styles.bannerInner}
+              activeOpacity={0.85}
+              onPress={() => {
+                if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+                Animated.timing(bannerAnim, { toValue: -80, duration: 220, useNativeDriver: true }).start(() => setBannerMsg(null));
+              }}
+            >
+              <View style={[styles.bannerAvatar, { backgroundColor: C.primary }]}>
+                <Text style={styles.bannerAvatarText}>
+                  {(bannerMsg.senderName.charAt(0) || '?').toUpperCase()}
+                </Text>
+              </View>
+              <View style={styles.bannerText}>
+                <Text style={styles.bannerName} numberOfLines={1}>{bannerMsg.senderName}</Text>
+                <Text style={styles.bannerPreview} numberOfLines={1}>{bannerMsg.preview}</Text>
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+
         <KeyboardAvoidingView
           style={styles.kav}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -1160,6 +1209,40 @@ const styles = StyleSheet.create({
   headerName: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
   headerStatus: { fontSize: 11, color: Colors.online },
   headerRight: { width: 36 },
+  banner: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+  },
+  bannerInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(30,30,30,0.92)',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
+  bannerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bannerAvatarText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
+  bannerText: { flex: 1 },
+  bannerName: { fontSize: 13, fontWeight: '700', color: '#FFFFFF', marginBottom: 2 },
+  bannerPreview: { fontSize: 12, color: 'rgba(255,255,255,0.75)' },
   kav: { flex: 1 },
   // inverted flips the list, so paddingTop becomes visual bottom padding
   messageList: { paddingVertical: 12, paddingHorizontal: 4, flexGrow: 1 },
