@@ -167,6 +167,8 @@ export function PhotoGallery({ userId, isOwner }: Props) {
             <Image source={{ uri: photo.photo_url }} style={styles.photo} resizeMode="cover" />
             {photo.caption ? (
               <Text style={styles.captionBelow} numberOfLines={2}>{photo.caption}</Text>
+            ) : isOwner ? (
+              <Text style={styles.captionPlaceholder}>＋ コメントを追加</Text>
             ) : null}
           </TouchableOpacity>
         ))}
@@ -379,12 +381,22 @@ const styles = StyleSheet.create({
     height: ITEM_SIZE,
   },
   captionBelow: {
-    fontSize: 12,
+    fontSize: 13,
+    fontWeight: '500',
     color: Colors.textPrimary,
     paddingHorizontal: 4,
-    paddingTop: 4,
-    paddingBottom: 4,
-    lineHeight: 17,
+    paddingTop: 5,
+    paddingBottom: 5,
+    lineHeight: 18,
+    backgroundColor: Colors.surface,
+  },
+  captionPlaceholder: {
+    fontSize: 12,
+    color: '#1976D2',
+    fontWeight: '500',
+    paddingHorizontal: 4,
+    paddingTop: 5,
+    paddingBottom: 5,
     backgroundColor: Colors.surface,
   },
   addButton: {

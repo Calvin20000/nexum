@@ -73,9 +73,9 @@ Deno.serve(async (req: Request) => {
     const senderName = sender?.display_name || sender?.handle || "Someone";
     const body =
       record.message_type === "image"
-        ? "📷 画像を送りました"
+        ? "📷 写真を送りました"
         : record.message_type === "sticker"
-        ? "スタンプを送りました"
+        ? record.content || "😊"
         : record.content?.slice(0, 100) ?? "";
 
     // オンライン・オフライン問わず常に送信
@@ -87,6 +87,8 @@ Deno.serve(async (req: Request) => {
       data: {
         conversationId: record.conversation_id,
         senderId: record.sender_id,
+        messageType: record.message_type,
+        messageContent: record.content ?? "",
         type: "new_message",
       },
       // 優先度を高に設定（フォアグラウンド時も確実に届ける）

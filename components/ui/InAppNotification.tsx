@@ -19,11 +19,24 @@ export type InAppNotificationData = {
   body: string;
   conversationId: string;
   avatarUrl?: string;
+  messageType?: string;
+  messageContent?: string;
 };
 
 export type InAppNotificationRef = {
   show: (data: InAppNotificationData) => void;
 };
+
+function getPreview(data: InAppNotificationData): string {
+  switch (data.messageType) {
+    case 'image':
+      return '📷 写真を送りました';
+    case 'sticker':
+      return data.messageContent || '😊';
+    default:
+      return data.messageContent?.substring(0, 30) || data.body;
+  }
+}
 
 export const InAppNotification = forwardRef<InAppNotificationRef>((_props, ref) => {
   const router = useRouter();
@@ -79,7 +92,7 @@ export const InAppNotification = forwardRef<InAppNotificationRef>((_props, ref) 
 
         <View style={styles.textArea}>
           <Text style={styles.title} numberOfLines={1}>{notification.title}</Text>
-          <Text style={styles.body} numberOfLines={2}>{notification.body}</Text>
+          <Text style={styles.body} numberOfLines={2}>{getPreview(notification)}</Text>
         </View>
 
         <TouchableOpacity
@@ -112,50 +125,50 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    gap: 10,
+    gap: 12,
     borderLeftWidth: 4,
     borderLeftColor: '#1976D2',
     shadowColor: '#1976D2',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.2,
     shadowRadius: 12,
     elevation: 8,
     maxWidth: width,
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     overflow: 'hidden',
     flexShrink: 0,
   },
   avatarImage: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
   },
   avatarFallback: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     backgroundColor: '#E3F2FD',
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarInitial: {
     color: '#1976D2',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
   },
   textArea: { flex: 1 },
   title: {
     color: '#0D47A1',
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 2,
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 3,
   },
   body: {
     color: '#424242',
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 19,
   },
   closeBtn: { paddingLeft: 4 },
   closeIcon: { color: '#9E9E9E', fontSize: 14 },

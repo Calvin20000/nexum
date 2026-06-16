@@ -97,13 +97,32 @@ export default function RootLayout() {
     const receivedSub = Notifications.addNotificationReceivedListener((notification) => {
       const { title, body, data } = notification.request.content;
       const conversationId = data?.conversationId as string | undefined;
+      const senderId = data?.senderId as string | undefined;
+      const messageType = data?.messageType as string | undefined;
+      const messageContent = data?.messageContent as string | undefined;
       if (conversationId) {
-        notificationRef.current?.show({
-          id: notification.request.identifier,
-          title: title || 'NEXUM',
-          body: body || '',
-          conversationId,
-        });
+        // Fetch sender avatar asynchronously then show popup
+        const showNotif = (avatarUrl?: string) => {
+          notificationRef.current?.show({
+            id: notification.request.identifier,
+            title: title || 'NEXUM',
+            body: body || '',
+            conversationId,
+            avatarUrl,
+            messageType,
+            messageContent,
+          });
+        };
+        if (senderId) {
+          supabase
+            .from('users')
+            .select('avatar_url')
+            .eq('id', senderId)
+            .maybeSingle()
+            .then(({ data: user }) => showNotif(user?.avatar_url ?? undefined));
+        } else {
+          showNotif();
+        }
       }
     });
 
