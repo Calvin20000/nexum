@@ -15,7 +15,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
-import { ChevronLeft, Send, Users, Smile, Sticker } from 'lucide-react-native';
+import { ChevronLeft, Send, Users, Smile, Sticker, ImageIcon } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '@/stores/authStore';
 import { GroupMessage } from '@/types/database';
 import { useGroupChatMessages } from '@/hooks/useGroupChat';
@@ -24,6 +25,8 @@ import { EmojiPicker } from '@/components/EmojiPicker';
 import { StickerPicker, Sticker as StickerType } from '@/components/StickerPicker';
 import { Colors } from '@/lib/colors';
 import { useColors } from '@/lib/theme';
+import { uploadImageToStorage } from '@/lib/imageUpload';
+import { supabase } from '@/lib/supabase';
 
 type PanelType = 'none' | 'emoji' | 'sticker';
 
@@ -72,6 +75,51 @@ export default function GroupChatScreen() {
     closePanel();
     await sendMessage(sticker.emoji, 'sticker');
     scrollToBottom();
+  };
+
+  const handlePickImage = async () => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        const uri = URL.createObjectURL(file);
+        await uploadAndSendImage(uri, file.type || 'image/jpeg');
+      };
+      input.click();
+      return;
+    }
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('権限が必要です', '写真へのアクセスを許可してください');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    await uploadAndSendImage(asset.uri, asset.mimeType ?? 'image/jpeg');
+  };
+
+  const uploadAndSendImage = async (uri: string, mimeType: string) => {
+    if (!userId || !id) return;
+    const ext = mimeType.includes('png') ? 'png' : 'jpg';
+    const path = `group/${id}/${Date.now()}.${ext}`;
+    try {
+      const publicUrl = await uploadImageToStorage(uri, 'chats', path, mimeType);
+      await (supabase.from('group_messages' as any) as any).insert({
+        group_id: id,
+        sender_id: userId,
+        message_type: 'image',
+        image_url: publicUrl,
+      });
+    } catch (e) {
+      Alert.alert('エラー', '画像の送信に失敗しました');
+    }
   };
 
   const handleDeleteMessage = (msg: GroupMessage) => {
@@ -271,6 +319,13 @@ export default function GroupChatScreen() {
             onPress={() => openPanel('emoji')}
           >
             <Smile size={22} color={panel === 'emoji' ? C.primary : Colors.textMuted} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.toolBtn}
+            onPress={handlePickImage}
+            disabled={sending}
+          >
+            <ImageIcon size={22} color={Colors.textMuted} />
           </TouchableOpacity>
 
           <TextInput
