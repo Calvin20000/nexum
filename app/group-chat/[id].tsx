@@ -19,7 +19,7 @@ import { ChevronLeft, Send, Users, Smile, Sticker } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
-import { GroupChat, GroupChatMessage, UserProfile } from '@/types/database';
+import { GroupConversation, GroupMessage, UserProfile } from '@/types/database';
 import { Avatar } from '@/components/Avatar';
 import { EmojiPicker } from '@/components/EmojiPicker';
 import { StickerPicker, Sticker as StickerType } from '@/components/StickerPicker';
@@ -34,25 +34,15 @@ function formatTime(iso: string) {
   return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
 }
 
-function formatLastSeen(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'たった今';
-  if (mins < 60) return `${mins}分前`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}時間前`;
-  return new Date(iso).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
-}
-
 export default function GroupChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuthStore();
   const C = useColors();
   const userId = session?.user?.id;
 
-  const [groupChat, setGroupChat] = useState<GroupChat | null>(null);
+  const [groupConv, setGroupConv] = useState<GroupConversation | null>(null);
   const [members, setMembers] = useState<UserProfile[]>([]);
-  const [messages, setMessages] = useState<GroupChatMessage[]>([]);
+  const [messages, setMessages] = useState<GroupMessage[]>([]);
   const [senderMap, setSenderMap] = useState<Record<string, UserProfile>>({});
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -73,17 +63,17 @@ export default function GroupChatScreen() {
     if (!id || !userId) return;
 
     const [{ data: gc }, { data: memberRows }, { data: msgs }] = await Promise.all([
-      supabase.from('group_chats' as any).select('*').eq('id', id).maybeSingle(),
-      supabase.from('group_chat_members' as any).select('user_id').eq('group_chat_id', id),
+      supabase.from('group_conversations' as any).select('*').eq('id', id).maybeSingle(),
+      supabase.from('group_members' as any).select('user_id').eq('group_id', id),
       supabase
-        .from('group_chat_messages' as any)
+        .from('group_messages' as any)
         .select('*')
-        .eq('group_chat_id', id)
+        .eq('group_id', id)
         .order('created_at', { ascending: false })
         .limit(PAGE_SIZE),
     ]);
 
-    setGroupChat(gc as GroupChat);
+    setGroupConv(gc as GroupConversation);
     setHasMore((msgs?.length ?? 0) === PAGE_SIZE);
 
     const memberIds = ((memberRows ?? []) as any[]).map((m: any) => m.user_id);
@@ -96,7 +86,7 @@ export default function GroupChatScreen() {
       setSenderMap(map);
     }
 
-    setMessages((msgs ?? []) as GroupChatMessage[]);
+    setMessages((msgs ?? []) as GroupMessage[]);
     setLoading(false);
   }, [id, userId]);
 
@@ -105,14 +95,14 @@ export default function GroupChatScreen() {
     setIsLoadingMore(true);
 
     const { data } = await supabase
-      .from('group_chat_messages' as any)
+      .from('group_messages' as any)
       .select('*')
-      .eq('group_chat_id', id)
+      .eq('group_id', id)
       .order('created_at', { ascending: false })
       .range(messages.length, messages.length + PAGE_SIZE - 1);
 
     if (data && data.length > 0) {
-      setMessages((prev) => [...prev, ...(data as GroupChatMessage[])]);
+      setMessages((prev) => [...prev, ...(data as GroupMessage[])]);
       setHasMore(data.length === PAGE_SIZE);
     } else {
       setHasMore(false);
@@ -124,12 +114,12 @@ export default function GroupChatScreen() {
     fetchData();
 
     const channel = supabase
-      .channel(`group_chat_${id}`)
+      .channel(`group_conv_${id}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'group_chat_messages', filter: `group_chat_id=eq.${id}` },
+        { event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_id=eq.${id}` },
         async (payload) => {
-          const newMsg = payload.new as GroupChatMessage;
+          const newMsg = payload.new as GroupMessage;
           setMessages((prev) => prev.find((m) => m.id === newMsg.id) ? prev : [newMsg, ...prev]);
           if (newMsg.sender_id !== userId) {
             if (!senderMap[newMsg.sender_id]) {
@@ -144,9 +134,9 @@ export default function GroupChatScreen() {
       )
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'group_chat_messages', filter: `group_chat_id=eq.${id}` },
+        { event: 'UPDATE', schema: 'public', table: 'group_messages', filter: `group_id=eq.${id}` },
         (payload) => {
-          const updated = payload.new as GroupChatMessage;
+          const updated = payload.new as GroupMessage;
           setMessages((prev) => prev.map((m) => m.id === updated.id ? updated : m));
         }
       )
@@ -162,9 +152,9 @@ export default function GroupChatScreen() {
 
   const closePanel = () => setPanel('none');
 
-  const makeTempMessage = (overrides: Partial<GroupChatMessage> & { message_type: GroupChatMessage['message_type'] }): GroupChatMessage => ({
+  const makeTempMessage = (overrides: Partial<GroupMessage> & { message_type: GroupMessage['message_type'] }): GroupMessage => ({
     id: `temp_${Date.now()}_${Math.random()}`,
-    group_chat_id: id as string,
+    group_id: id as string,
     sender_id: userId!,
     content: null,
     image_url: null,
@@ -174,7 +164,7 @@ export default function GroupChatScreen() {
     ...overrides,
   });
 
-  const resolveTemp = (tempId: string, real: GroupChatMessage) => {
+  const resolveTemp = (tempId: string, real: GroupMessage) => {
     setMessages((prev) =>
       prev.some((m) => m.id === real.id)
         ? prev.filter((m) => m.id !== tempId)
@@ -182,7 +172,7 @@ export default function GroupChatScreen() {
     );
   };
 
-  const sendMessage = async (content: string, type: 'text' | 'sticker' = 'text') => {
+  const sendMessage = async (content: string, type: GroupMessage['message_type'] = 'text') => {
     if (!content.trim() || !userId || !id || sending) return;
     setSending(true);
 
@@ -190,9 +180,9 @@ export default function GroupChatScreen() {
     setMessages((prev) => [temp, ...prev]);
     scrollToBottom();
 
-    const { data: msg, error } = await (supabase.from('group_chat_messages' as any) as any)
+    const { data: msg, error } = await (supabase.from('group_messages' as any) as any)
       .insert({
-        group_chat_id: id,
+        group_id: id,
         sender_id: userId,
         message_type: type,
         content: content.trim(),
@@ -201,9 +191,9 @@ export default function GroupChatScreen() {
       .single();
 
     if (!error && msg) {
-      resolveTemp(temp.id, msg as GroupChatMessage);
-      (supabase.from('group_chats' as any) as any)
-        .update({ last_message_at: (msg as GroupChatMessage).created_at })
+      resolveTemp(temp.id, msg as GroupMessage);
+      (supabase.from('group_conversations' as any) as any)
+        .update({ last_message_at: (msg as GroupMessage).created_at })
         .eq('id', id);
     } else {
       setMessages((prev) => prev.filter((m) => m.id !== temp.id));
@@ -222,14 +212,14 @@ export default function GroupChatScreen() {
     await sendMessage(sticker.emoji, 'sticker');
   };
 
-  const handleDeleteMessage = (msg: GroupChatMessage) => {
+  const handleDeleteMessage = (msg: GroupMessage) => {
     if (msg.sender_id !== userId) return;
     Alert.alert('メッセージを削除', '削除しますか？', [
       { text: 'キャンセル', style: 'cancel' },
       {
         text: '削除', style: 'destructive',
         onPress: () => {
-          (supabase.from('group_chat_messages' as any) as any)
+          (supabase.from('group_messages' as any) as any)
             .update({ is_deleted: true })
             .eq('id', msg.id);
         },
@@ -237,7 +227,7 @@ export default function GroupChatScreen() {
     ]);
   };
 
-  const renderMessage = useCallback(({ item, index }: { item: GroupChatMessage; index: number }) => {
+  const renderMessage = useCallback(({ item, index }: { item: GroupMessage; index: number }) => {
     const isOwn = item.sender_id === userId;
     const sender = senderMap[item.sender_id];
     const prevMsg = index < messages.length - 1 ? messages[index + 1] : null;
@@ -255,7 +245,7 @@ export default function GroupChatScreen() {
       );
     }
 
-    if (item.message_type === 'sticker') {
+    if (item.message_type === 'sticker' || item.message_type === 'stamp') {
       return (
         <View style={[styles.msgRow, isOwn ? styles.msgRowOwn : styles.msgRowOther]}>
           {!isOwn && (
@@ -263,7 +253,14 @@ export default function GroupChatScreen() {
               ? <Avatar uri={sender?.avatar_url} name={sender?.display_name || sender?.handle} size={30} />
               : <View style={{ width: 30 }} />
           )}
-          <Text style={styles.sticker}>{item.content}</Text>
+          <View style={styles.msgColumn}>
+            {showName && (
+              <Text style={[styles.senderName, { color: C.primary }]}>
+                {sender?.display_name || sender?.handle}
+              </Text>
+            )}
+            <Text style={styles.sticker}>{item.content}</Text>
+          </View>
         </View>
       );
     }
@@ -276,10 +273,19 @@ export default function GroupChatScreen() {
               ? <Avatar uri={sender?.avatar_url} name={sender?.display_name || sender?.handle} size={30} />
               : <View style={{ width: 30 }} />
           )}
-          <TouchableOpacity onLongPress={() => handleDeleteMessage(item)} activeOpacity={0.9}>
-            <Image source={{ uri: item.image_url }} style={styles.imageBubble} resizeMode="cover" />
-          </TouchableOpacity>
-          <Text style={styles.timeLabel}>{formatTime(item.created_at)}</Text>
+          <View style={styles.msgColumn}>
+            {showName && (
+              <Text style={[styles.senderName, { color: C.primary }]}>
+                {sender?.display_name || sender?.handle}
+              </Text>
+            )}
+            <TouchableOpacity onLongPress={() => handleDeleteMessage(item)} activeOpacity={0.9}>
+              <Image source={{ uri: item.image_url }} style={styles.imageBubble} resizeMode="cover" />
+            </TouchableOpacity>
+            <Text style={[styles.timeLabel, isOwn ? styles.timeLabelOwn : styles.timeLabelOther]}>
+              {formatTime(item.created_at)}
+            </Text>
+          </View>
         </View>
       );
     }
@@ -344,7 +350,7 @@ export default function GroupChatScreen() {
             <Users size={18} color={C.primary} />
           </View>
           <View>
-            <Text style={styles.headerName} numberOfLines={1}>{groupChat?.name}</Text>
+            <Text style={styles.headerName} numberOfLines={1}>{groupConv?.name}</Text>
             <Text style={styles.headerSub}>{members.length}人のメンバー</Text>
           </View>
         </TouchableOpacity>
@@ -543,16 +549,16 @@ const styles = StyleSheet.create({
   toolBtnActive: { backgroundColor: Colors.surface },
   textInput: {
     flex: 1,
-    backgroundColor: Colors.inputBackground,
-    borderRadius: 22,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
+    minHeight: 36,
+    maxHeight: 120,
+    backgroundColor: Colors.surface,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     fontSize: 15,
     color: Colors.textPrimary,
-    maxHeight: 120,
     borderWidth: 1,
     borderColor: Colors.border,
-    minHeight: 38,
   },
   sendBtn: {
     width: 38,

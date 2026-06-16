@@ -224,3 +224,31 @@ export type GroupChatWithDetails = GroupChat & {
   members: UserProfile[];
   last_message?: GroupChatMessage | null;
 };
+
+export interface GroupConversation {
+  id: string;
+  name: string;
+  owner_id: string;
+  avatar_url: string | null;
+  last_message_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GroupMessage {
+  id: string;
+  group_id: string;
+  sender_id: string;
+  message_type: 'text' | 'image' | 'sticker' | 'stamp';
+  content: string | null;
+  image_url: string | null;
+  is_deleted: boolean;
+  reply_to_id: string | null;
+  created_at: string;
+  sender?: UserProfile;
+}
+
+export type GroupConversationWithDetails = GroupConversation & {
+  members: UserProfile[];
+  last_message?: GroupMessage | null;
+};

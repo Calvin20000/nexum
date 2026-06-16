@@ -149,12 +149,12 @@ const styles = StyleSheet.create({
   avatarFallback: {
     width: 48,
     height: 48,
-    backgroundColor: '#E3F2FD',
+    backgroundColor: '#1976D2',
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarInitial: {
-    color: '#1976D2',
+    color: '#FFFFFF',
     fontSize: 20,
     fontWeight: '700',
   },
