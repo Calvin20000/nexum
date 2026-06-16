@@ -21,8 +21,10 @@ import { useColors } from '@/lib/theme';
 
 const MESSAGE_PREVIEW_KEY = 'message_preview_enabled';
 
+type ConversationWithUnread = ConversationWithUser & { unread_count: number };
+
 type ChatListItem =
-  | { type: 'dm'; data: ConversationWithUser }
+  | { type: 'dm'; data: ConversationWithUnread }
   | { type: 'group'; data: GroupChatWithDetails };
 
 function formatRelativeTime(iso: string): string {
@@ -145,16 +147,27 @@ export default function ChatsScreen() {
       .or(`participant_1_id.eq.${userId},participant_2_id.eq.${userId}`)
       .order('last_message_at', { ascending: false });
 
-    const dmItems: ConversationWithUser[] = await Promise.all(
+    const dmItems: ConversationWithUnread[] = await Promise.all(
       (dmData ?? []).map(async (conv) => {
         const otherId = conv.participant_1_id === userId ? conv.participant_2_id : conv.participant_1_id;
-        const [userRes, msgRes] = await Promise.all([
+        const [userRes, msgRes, unreadRes] = await Promise.all([
           supabase.from('users').select('*').eq('id', otherId).maybeSingle(),
           conv.last_message_id
             ? supabase.from('messages').select('*').eq('id', conv.last_message_id).maybeSingle()
             : Promise.resolve({ data: null }),
+          supabase
+            .from('messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('conversation_id', conv.id)
+            .is('read_at', null)
+            .neq('sender_id', userId),
         ]);
-        return { ...conv, other_user: userRes.data!, last_message: msgRes.data };
+        return {
+          ...conv,
+          other_user: userRes.data!,
+          last_message: msgRes.data,
+          unread_count: unreadRes.count ?? 0,
+        };
       })
     );
 
@@ -208,6 +221,7 @@ export default function ChatsScreen() {
       .channel('conversations_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => fetchConversations())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => fetchConversations())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, () => fetchConversations())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_chat_messages' }, () => fetchConversations())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'group_chats' }, () => fetchConversations())
       .subscribe();

@@ -3,49 +3,43 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Avatar } from './Avatar';
 import { ConversationWithUser } from '@/types/database';
 import { Colors } from '@/lib/colors';
-import { useColors } from '@/lib/theme';
+
+const UNREAD_BLUE = '#1976D2';
 
 interface ConversationItemProps {
-  item: ConversationWithUser;
+  item: ConversationWithUser & { unread_count?: number };
   onPress: () => void;
   previewEnabled?: boolean;
 }
 
-function formatRelativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'たった今';
-  if (mins < 60) return `${mins}分前`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}時間前`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}日前`;
-  return new Date(iso).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
+function formatTime(iso: string): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) {
+    return date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+  return date.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
 }
 
 export function ConversationItem({ item, onPress, previewEnabled = true }: ConversationItemProps) {
-  const C = useColors();
   const lastMsg = item.last_message;
   const user = item.other_user;
-  const isUnread = lastMsg && !lastMsg.read_at && lastMsg.sender_id !== user.id;
-
-  const senderName =
-    lastMsg?.sender_id === user.id
-      ? user.display_name || user.handle
-      : 'You';
+  const unreadCount = item.unread_count ?? 0;
+  const isUnread = unreadCount > 0;
 
   let previewText = '';
   if (lastMsg) {
     if (lastMsg.is_deleted) {
       previewText = 'メッセージが削除されました';
     } else if (!previewEnabled) {
-      previewText = isUnread ? '新着メッセージがあります' : (
-        lastMsg.message_type === 'image' ? `${senderName}：📷 画像` : `${senderName}：${lastMsg.content?.substring(0, 30) ?? ''}`
-      );
+      previewText = isUnread ? '新着メッセージがあります' : '';
     } else if (lastMsg.message_type === 'image') {
-      previewText = `${senderName}：📷 画像`;
+      previewText = '📷 画像';
+    } else if (lastMsg.message_type === 'sticker') {
+      previewText = 'スタンプ';
     } else {
-      previewText = `${senderName}：${lastMsg.content?.substring(0, 30) ?? ''}`;
+      previewText = lastMsg.content?.substring(0, 30) ?? '';
     }
   }
 
@@ -54,26 +48,31 @@ export function ConversationItem({ item, onPress, previewEnabled = true }: Conve
       <Avatar
         uri={user.avatar_url}
         name={user.display_name || user.handle}
-        size={52}
+        size={56}
         online={user.is_online}
       />
       <View style={styles.content}>
         <View style={styles.topRow}>
-          <Text style={styles.name} numberOfLines={1}>
+          <Text
+            style={[styles.name, isUnread && styles.nameUnread]}
+            numberOfLines={1}
+          >
             {user.display_name || user.handle}
           </Text>
-          <Text style={styles.time}>{formatRelativeTime(item.last_message_at)}</Text>
+          <Text style={styles.time}>{formatTime(item.last_message_at)}</Text>
         </View>
         <View style={styles.bottomRow}>
           <Text
-            style={[styles.preview, isUnread && { color: C.primary, fontWeight: '700' }]}
+            style={[styles.preview, isUnread && styles.previewUnread]}
             numberOfLines={1}
           >
             {previewText}
           </Text>
           {isUnread && (
-            <View style={[styles.newBadge, { backgroundColor: C.primary }]}>
-              <Text style={styles.newBadgeText}>NEW</Text>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </Text>
             </View>
           )}
         </View>
@@ -89,6 +88,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: Colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
     gap: 12,
   },
   content: {
@@ -101,42 +102,51 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   name: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#212121',
     flex: 1,
+    marginRight: 8,
+  },
+  nameUnread: {
+    fontWeight: '700',
+    color: '#0D47A1',
   },
   time: {
     fontSize: 12,
-    color: Colors.textMuted,
-    marginLeft: 8,
+    color: '#9E9E9E',
+    flexShrink: 0,
   },
   bottomRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 8,
   },
   preview: {
-    fontSize: 13,
-    color: Colors.textSecondary,
+    fontSize: 14,
+    color: '#9E9E9E',
+    fontWeight: '400',
     flex: 1,
   },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginLeft: 8,
+  previewUnread: {
+    fontWeight: '700',
+    color: '#424242',
   },
-  newBadge: {
-    borderRadius: 6,
+  badge: {
+    backgroundColor: UNREAD_BLUE,
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
     paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginLeft: 6,
+    flexShrink: 0,
   },
-  newBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
+  badgeText: {
     color: '#FFFFFF',
-    letterSpacing: 0.5,
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
   },
 });

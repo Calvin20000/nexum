@@ -94,7 +94,7 @@ export default function TabsLayout() {
           title: 'チャット',
           tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : undefined,
           tabBarBadgeStyle: {
-            backgroundColor: C.primary,
+            backgroundColor: '#1976D2',
             fontSize: 11,
             fontWeight: '700',
             minWidth: 18,
