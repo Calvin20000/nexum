@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Edit2, LogOut, QrCode, X, Share2, Copy, Check } from 'lucide-react-native';
+import { Edit2, LogOut, QrCode, X, Share2, Copy, Check, ScanLine } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import QRCode from 'react-native-qrcode-svg';
 import { useAuthStore } from '@/stores/authStore';
@@ -279,10 +279,20 @@ export default function ProfileScreen() {
           </View>
 
           {/* Bottom action */}
-          <TouchableOpacity style={[styles.qrShareFullBtn, { backgroundColor: C.primary, shadowColor: C.primary }]} onPress={handleShare} activeOpacity={0.85}>
-            <Share2 size={18} color={Colors.white} />
-            <Text style={styles.qrShareFullText}>ハンドルをシェア</Text>
-          </TouchableOpacity>
+          <View style={styles.qrBottomActions}>
+            <TouchableOpacity style={[styles.qrShareFullBtn, { backgroundColor: C.primary, shadowColor: C.primary }]} onPress={handleShare} activeOpacity={0.85}>
+              <Share2 size={18} color={Colors.white} />
+              <Text style={styles.qrShareFullText}>ハンドルをシェア</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.qrScanBtn, { borderColor: C.primary }]}
+              onPress={() => { setShowQR(false); router.push('/friend/scan'); }}
+              activeOpacity={0.85}
+            >
+              <ScanLine size={18} color={C.primary} />
+              <Text style={[styles.qrScanBtnText, { color: C.primary }]}>QRをスキャン</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </SafeAreaView>
@@ -669,16 +679,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
 
+  qrBottomActions: {
+    gap: 10,
+    width: '100%',
+    marginBottom: 8,
+  },
   qrShareFullBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: Colors.primary,
     borderRadius: 16,
     paddingVertical: 16,
-    marginBottom: 8,
-    shadowColor: Colors.primary,
     shadowOpacity: 0.3,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
@@ -686,6 +698,20 @@ const styles = StyleSheet.create({
   },
   qrShareFullText: {
     color: Colors.white,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  qrScanBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    borderRadius: 16,
+    paddingVertical: 15,
+    borderWidth: 2,
+    backgroundColor: Colors.white,
+  },
+  qrScanBtnText: {
     fontSize: 16,
     fontWeight: '700',
   },

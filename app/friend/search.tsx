@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Search, UserPlus, Check } from 'lucide-react-native';
+import { ChevronLeft, Search, UserPlus, Check, QrCode } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
 import { UserProfile, Friendship } from '@/types/database';
@@ -130,7 +130,13 @@ export default function FriendSearchScreen() {
           <ChevronLeft size={24} color={C.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>ユーザーを検索</Text>
-        <View style={styles.headerRight} />
+        <TouchableOpacity
+          style={[styles.qrBtn, { backgroundColor: C.surface }]}
+          onPress={() => router.push('/friend/scan')}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <QrCode size={20} color={C.primary} />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.searchBar}>
@@ -191,6 +197,13 @@ const styles = StyleSheet.create({
   backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700', color: Colors.textPrimary },
   headerRight: { width: 36 },
+  qrBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
