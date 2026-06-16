@@ -166,9 +166,7 @@ export function PhotoGallery({ userId, isOwner }: Props) {
           >
             <Image source={{ uri: photo.photo_url }} style={styles.photo} resizeMode="cover" />
             {photo.caption ? (
-              <View style={styles.captionOverlay}>
-                <Text style={styles.captionOverlayText} numberOfLines={2}>{photo.caption}</Text>
-              </View>
+              <Text style={styles.captionBelow} numberOfLines={2}>{photo.caption}</Text>
             ) : null}
           </TouchableOpacity>
         ))}
@@ -372,28 +370,22 @@ const styles = StyleSheet.create({
   },
   photoItem: {
     width: ITEM_SIZE,
-    height: ITEM_SIZE,
     borderRadius: 10,
     overflow: 'hidden',
     backgroundColor: Colors.surface,
   },
   photo: {
-    width: '100%',
-    height: '100%',
+    width: ITEM_SIZE,
+    height: ITEM_SIZE,
   },
-  captionOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    paddingHorizontal: 5,
-    paddingVertical: 4,
-  },
-  captionOverlayText: {
-    fontSize: 10,
-    color: '#FFFFFF',
-    lineHeight: 13,
+  captionBelow: {
+    fontSize: 12,
+    color: Colors.textPrimary,
+    paddingHorizontal: 4,
+    paddingTop: 4,
+    paddingBottom: 4,
+    lineHeight: 17,
+    backgroundColor: Colors.surface,
   },
   addButton: {
     width: ITEM_SIZE,
