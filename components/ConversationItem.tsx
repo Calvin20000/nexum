@@ -35,13 +35,15 @@ export function ConversationItem({ item, onPress, previewEnabled = true }: Conve
     } else if (!previewEnabled) {
       previewText = isUnread ? '新着メッセージがあります' : '';
     } else if (lastMsg.message_type === 'image') {
-      previewText = '📷 画像';
-    } else if (lastMsg.message_type === 'sticker') {
-      previewText = 'スタンプ';
+      previewText = '📷 写真';
+    } else if (lastMsg.message_type === 'sticker' || lastMsg.message_type === 'stamp') {
+      previewText = lastMsg.content || '😊';
     } else {
       previewText = lastMsg.content?.substring(0, 30) ?? '';
     }
   }
+
+  const isStamp = lastMsg?.message_type === 'sticker' || lastMsg?.message_type === 'stamp';
 
   return (
     <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
@@ -63,7 +65,7 @@ export function ConversationItem({ item, onPress, previewEnabled = true }: Conve
         </View>
         <View style={styles.bottomRow}>
           <Text
-            style={[styles.preview, isUnread && styles.previewUnread]}
+            style={[styles.preview, isUnread && styles.previewUnread, isStamp && styles.previewStamp]}
             numberOfLines={1}
           >
             {previewText}
@@ -132,6 +134,9 @@ const styles = StyleSheet.create({
   previewUnread: {
     fontWeight: '700',
     color: '#424242',
+  },
+  previewStamp: {
+    fontSize: 20,
   },
   badge: {
     backgroundColor: UNREAD_BLUE,
