@@ -29,18 +29,23 @@ export function ConversationItem({ item, onPress, previewEnabled = true }: Conve
   const user = item.other_user;
   const isUnread = lastMsg && !lastMsg.read_at && lastMsg.sender_id !== user.id;
 
+  const senderName =
+    lastMsg?.sender_id === user.id
+      ? user.display_name || user.handle
+      : 'You';
+
   let previewText = '';
   if (lastMsg) {
     if (lastMsg.is_deleted) {
       previewText = 'メッセージが削除されました';
     } else if (!previewEnabled) {
       previewText = isUnread ? '新着メッセージがあります' : (
-        lastMsg.message_type === 'image' ? '📷 画像' : (lastMsg.content?.substring(0, 30) ?? '')
+        lastMsg.message_type === 'image' ? `${senderName}：📷 画像` : `${senderName}：${lastMsg.content?.substring(0, 30) ?? ''}`
       );
     } else if (lastMsg.message_type === 'image') {
-      previewText = '📷 画像';
+      previewText = `${senderName}：📷 画像`;
     } else {
-      previewText = lastMsg.content?.substring(0, 30) ?? '';
+      previewText = `${senderName}：${lastMsg.content?.substring(0, 30) ?? ''}`;
     }
   }
 
@@ -61,12 +66,16 @@ export function ConversationItem({ item, onPress, previewEnabled = true }: Conve
         </View>
         <View style={styles.bottomRow}>
           <Text
-            style={[styles.preview, isUnread && { color: C.primary, fontWeight: '600' }]}
+            style={[styles.preview, isUnread && { color: C.primary, fontWeight: '700' }]}
             numberOfLines={1}
           >
-            {previewText || 'チャットを開始しましょう'}
+            {previewText}
           </Text>
-          {isUnread && <View style={[styles.unreadDot, { backgroundColor: C.primary }]} />}
+          {isUnread && (
+            <View style={[styles.newBadge, { backgroundColor: C.primary }]}>
+              <Text style={styles.newBadgeText}>NEW</Text>
+            </View>
+          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -117,5 +126,17 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     marginLeft: 8,
+  },
+  newBadge: {
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 6,
+  },
+  newBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
 });

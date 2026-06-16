@@ -8,13 +8,14 @@ import {
   Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, Lock, Info, ChevronRight, LogOut, Volume2, MessageSquare, Palette } from 'lucide-react-native';
+import { Bell, Lock, Info, ChevronRight, LogOut, Volume2, Vibrate, MessageSquare, Palette } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '@/lib/colors';
 import { useAuthStore } from '@/stores/authStore';
 import { useTheme, THEME_COLORS } from '@/lib/theme';
 
 export const SOUND_ENABLED_KEY = 'sound_enabled';
+export const VIBRATE_ENABLED_KEY = 'vibrate_enabled';
 export const MESSAGE_PREVIEW_KEY = 'message_preview_enabled';
 
 export default function SettingsScreen() {
@@ -23,10 +24,14 @@ export default function SettingsScreen() {
   const [notifications, setNotifications] = React.useState(true);
   const [messagePreview, setMessagePreview] = React.useState(true);
   const [soundEnabled, setSoundEnabled] = React.useState(true);
+  const [vibrateEnabled, setVibrateEnabled] = React.useState(true);
 
   useEffect(() => {
     AsyncStorage.getItem(SOUND_ENABLED_KEY).then((val) => {
       if (val !== null) setSoundEnabled(val === 'true');
+    });
+    AsyncStorage.getItem(VIBRATE_ENABLED_KEY).then((val) => {
+      if (val !== null) setVibrateEnabled(val !== 'false');
     });
     AsyncStorage.getItem(MESSAGE_PREVIEW_KEY).then((val) => {
       if (val !== null) setMessagePreview(val !== 'false');
@@ -36,6 +41,11 @@ export default function SettingsScreen() {
   const handleSoundToggle = async (value: boolean) => {
     setSoundEnabled(value);
     await AsyncStorage.setItem(SOUND_ENABLED_KEY, value ? 'true' : 'false');
+  };
+
+  const handleVibrateToggle = async (value: boolean) => {
+    setVibrateEnabled(value);
+    await AsyncStorage.setItem(VIBRATE_ENABLED_KEY, value ? 'true' : 'false');
   };
 
   const handleMessagePreviewToggle = async (value: boolean) => {
@@ -77,6 +87,21 @@ export default function SettingsScreen() {
             <Switch
               value={soundEnabled}
               onValueChange={handleSoundToggle}
+              trackColor={{ false: Colors.separator, true: primaryColor }}
+              thumbColor={Colors.white}
+            />
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <View style={styles.rowLeft}>
+              <View style={[styles.iconBox, { backgroundColor: '#E3F2FD' }]}>
+                <Vibrate size={18} color={primaryColor} />
+              </View>
+              <Text style={styles.rowLabel}>バイブレーション</Text>
+            </View>
+            <Switch
+              value={vibrateEnabled}
+              onValueChange={handleVibrateToggle}
               trackColor={{ false: Colors.separator, true: primaryColor }}
               thumbColor={Colors.white}
             />

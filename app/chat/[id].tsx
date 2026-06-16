@@ -32,7 +32,7 @@ import { StickerPicker, Sticker as StickerType } from '@/components/StickerPicke
 import { Avatar } from '@/components/Avatar';
 import { Colors } from '@/lib/colors';
 import { useColors } from '@/lib/theme';
-import { SOUND_ENABLED_KEY } from '@/app/(tabs)/settings';
+import { SOUND_ENABLED_KEY, VIBRATE_ENABLED_KEY } from '@/app/(tabs)/settings';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const PAGE_SIZE = 50;
@@ -342,11 +342,16 @@ export default function ChatScreen() {
               if (u) setSenderMap((prev) => ({ ...prev, [u.id]: u }));
             }
             if (Platform.OS !== 'web') {
-              const soundOn = await AsyncStorage.getItem(SOUND_ENABLED_KEY);
-              if (soundOn !== 'false') {
+              const [soundVal, vibrateVal] = await Promise.all([
+                AsyncStorage.getItem(SOUND_ENABLED_KEY),
+                AsyncStorage.getItem(VIBRATE_ENABLED_KEY),
+              ]);
+              const soundOn = soundVal !== 'false';
+              const vibrateOn = vibrateVal !== 'false';
+              if (soundOn) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              } else {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              } else if (vibrateOn) {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               }
             }
           }
