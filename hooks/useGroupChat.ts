@@ -120,7 +120,7 @@ export function useGroupChatMessages(groupId: string, userId: string | undefined
         .limit(PAGE_SIZE),
     ]);
 
-    setGroupConv(gc as GroupConversation);
+    setGroupConv(gc as unknown as GroupConversation);
     setHasMore((msgs?.length ?? 0) === PAGE_SIZE);
 
     const memberIds = ((memberRows ?? []) as any[]).map((m: any) => m.user_id);

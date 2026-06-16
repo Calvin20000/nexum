@@ -328,7 +328,7 @@ export function PhotoGallery({ userId, isOwner }: Props) {
                 {currentPhoto?.caption ? (
                   <Text style={styles.captionText}>{currentPhoto.caption}</Text>
                 ) : isOwner ? (
-                  <Text style={styles.captionPlaceholder}>コメントを追加する</Text>
+                  <Text style={styles.captionModalPlaceholder}>コメントを追加する</Text>
                 ) : null}
               </TouchableOpacity>
             )}
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
-  captionPlaceholder: {
+  captionModalPlaceholder: {
     fontSize: 13,
     color: 'rgba(255,255,255,0.4)',
     textAlign: 'center',

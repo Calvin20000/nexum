@@ -72,7 +72,7 @@ export interface Database {
           id: string;
           conversation_id: string;
           sender_id: string;
-          message_type: 'text' | 'image' | 'sticker';
+          message_type: 'text' | 'image' | 'sticker' | 'stamp';
           content: string | null;
           image_url: string | null;
           image_width: number | null;
@@ -86,7 +86,7 @@ export interface Database {
           id?: string;
           conversation_id: string;
           sender_id: string;
-          message_type?: 'text' | 'image' | 'sticker';
+          message_type?: 'text' | 'image' | 'sticker' | 'stamp';
           content?: string | null;
           image_url?: string | null;
           image_width?: number | null;
