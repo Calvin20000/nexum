@@ -5,13 +5,14 @@ import {
   StyleSheet,
   Animated,
   TouchableOpacity,
-  Image,
   Dimensions,
   Platform,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
+const TOP_INSET = Platform.OS === 'ios' ? 54 : 36;
 
 export type InAppNotificationData = {
   id: string;
@@ -32,9 +33,10 @@ function getPreview(data: InAppNotificationData): string {
     case 'image':
       return '📷 写真を送りました';
     case 'sticker':
+    case 'stamp':
       return data.messageContent || '😊';
     default:
-      return data.messageContent?.substring(0, 30) || data.body;
+      return data.messageContent?.substring(0, 35) || data.body || '';
   }
 }
 
@@ -42,14 +44,23 @@ export const InAppNotification = forwardRef<InAppNotificationRef>((_props, ref) 
   const router = useRouter();
   const [notification, setNotification] = useState<InAppNotificationData | null>(null);
   const translateY = useRef(new Animated.Value(-120)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hide = () => {
-    Animated.timing(translateY, {
-      toValue: -120,
-      duration: 280,
-      useNativeDriver: true,
-    }).start(() => setNotification(null));
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: -120,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => setNotification(null));
   };
 
   const show = (data: InAppNotificationData) => {
@@ -57,13 +68,21 @@ export const InAppNotification = forwardRef<InAppNotificationRef>((_props, ref) 
 
     setNotification(data);
     translateY.setValue(-120);
+    opacity.setValue(0);
 
-    Animated.spring(translateY, {
-      toValue: 0,
-      useNativeDriver: true,
-      tension: 100,
-      friction: 9,
-    }).start();
+    Animated.parallel([
+      Animated.spring(translateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 80,
+        friction: 8,
+      }),
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
 
     timeoutRef.current = setTimeout(hide, 4000);
   };
@@ -77,24 +96,46 @@ export const InAppNotification = forwardRef<InAppNotificationRef>((_props, ref) 
     router.push(`/chat/${notification.conversationId}` as any);
   };
 
+  const initial = notification.title.charAt(0).toUpperCase() || '?';
+
   return (
-    <Animated.View style={[styles.container, { transform: [{ translateY }] }]}>
-      <TouchableOpacity onPress={handleTap} activeOpacity={0.92} style={styles.inner}>
-        <View style={styles.avatar}>
+    <Animated.View
+      style={[
+        styles.container,
+        { transform: [{ translateY }], opacity },
+      ]}
+    >
+      <TouchableOpacity
+        onPress={handleTap}
+        activeOpacity={0.92}
+        style={styles.inner}
+      >
+        {/* アバター */}
+        <View style={styles.avatarWrapper}>
           {notification.avatarUrl ? (
-            <Image source={{ uri: notification.avatarUrl }} style={styles.avatarImage} />
+            <Image
+              source={{ uri: notification.avatarUrl }}
+              style={styles.avatar}
+              resizeMode="cover"
+            />
           ) : (
-            <View style={styles.avatarFallback}>
-              <Text style={styles.avatarInitial}>{notification.title.charAt(0).toUpperCase()}</Text>
+            <View style={[styles.avatar, styles.avatarFallback]}>
+              <Text style={styles.avatarInitial}>{initial}</Text>
             </View>
           )}
         </View>
 
+        {/* テキストエリア */}
         <View style={styles.textArea}>
-          <Text style={styles.title} numberOfLines={1}>{notification.title}</Text>
-          <Text style={styles.body} numberOfLines={2}>{getPreview(notification)}</Text>
+          <Text style={styles.senderName} numberOfLines={1}>
+            {notification.title}
+          </Text>
+          <Text style={styles.preview} numberOfLines={2}>
+            {getPreview(notification)}
+          </Text>
         </View>
 
+        {/* 閉じるボタン */}
         <TouchableOpacity
           onPress={hide}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -107,8 +148,6 @@ export const InAppNotification = forwardRef<InAppNotificationRef>((_props, ref) 
   );
 });
 
-const TOP_INSET = Platform.OS === 'ios' ? 54 : 36;
-
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
@@ -118,6 +157,7 @@ const styles = StyleSheet.create({
     zIndex: 9999,
     paddingHorizontal: 12,
     paddingTop: TOP_INSET,
+    backgroundColor: 'transparent',
   },
   inner: {
     backgroundColor: '#FFFFFF',
@@ -128,27 +168,22 @@ const styles = StyleSheet.create({
     gap: 12,
     borderLeftWidth: 4,
     borderLeftColor: '#1976D2',
-    shadowColor: '#1976D2',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 8,
     maxWidth: width,
+  },
+  avatarWrapper: {
+    flexShrink: 0,
   },
   avatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    overflow: 'hidden',
-    flexShrink: 0,
-  },
-  avatarImage: {
-    width: 48,
-    height: 48,
   },
   avatarFallback: {
-    width: 48,
-    height: 48,
     backgroundColor: '#1976D2',
     justifyContent: 'center',
     alignItems: 'center',
@@ -158,18 +193,20 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
   },
-  textArea: { flex: 1 },
-  title: {
+  textArea: {
+    flex: 1,
+    gap: 4,
+  },
+  senderName: {
     color: '#0D47A1',
     fontSize: 15,
     fontWeight: '800',
-    marginBottom: 3,
   },
-  body: {
+  preview: {
     color: '#424242',
     fontSize: 14,
-    lineHeight: 19,
+    lineHeight: 20,
   },
   closeBtn: { paddingLeft: 4 },
-  closeIcon: { color: '#9E9E9E', fontSize: 14 },
+  closeIcon: { color: '#9E9E9E', fontSize: 14, fontWeight: '600' },
 });
