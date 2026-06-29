@@ -195,6 +195,8 @@ export function useGroupChatMessages(groupId: string, userId: string | undefined
     if (!content.trim() || !userId || !groupId || sending) return;
     setSending(true);
 
+    console.log('グループ送信 groupId:', groupId, 'sender_id:', userId, 'type:', type);
+
     const tempId = `temp_${Date.now()}_${Math.random()}`;
     const temp: GroupMessage = {
       id: tempId,
@@ -215,6 +217,7 @@ export function useGroupChatMessages(groupId: string, userId: string | undefined
       .single();
 
     if (!error && msg) {
+      console.log('グループ送信成功:', (msg as GroupMessage).id);
       setMessages((prev) =>
         prev.some((m) => m.id === (msg as GroupMessage).id)
           ? prev.filter((m) => m.id !== tempId)
@@ -224,6 +227,7 @@ export function useGroupChatMessages(groupId: string, userId: string | undefined
         .update({ last_message_at: (msg as GroupMessage).created_at })
         .eq('id', groupId);
     } else {
+      console.error('グループ送信エラー:', JSON.stringify(error));
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
     }
     setSending(false);

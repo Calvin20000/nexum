@@ -258,6 +258,7 @@ export default function ChatScreen() {
       .eq('id', id)
       .maybeSingle();
     if (!conv) {
+      console.error('会話が見つかりません conversationId:', id);
       setLoading(false);
       return;
     }
@@ -468,6 +469,8 @@ export default function ChatScreen() {
     setSending(true);
     clearTyping();
 
+    console.log('送信開始 conversationId:', id, 'sender_id:', userId);
+
     const currentReplyTo = replyTo;
     setReplyTo(null);
 
@@ -492,13 +495,16 @@ export default function ChatScreen() {
       .single();
 
     if (!error && msg) {
+      console.log('送信成功:', msg.id);
       resolveTemp(temp.id, msg);
       supabase
         .from('conversations')
         .update({ last_message_id: msg.id, last_message_at: msg.created_at })
         .eq('id', id);
     } else {
+      console.error('送信エラー:', JSON.stringify(error));
       setMessages((prev) => prev.filter((m) => m.id !== temp.id));
+      Alert.alert('送信エラー', error?.message ?? '不明なエラーが発生しました');
     }
     setSending(false);
   };
@@ -517,6 +523,8 @@ export default function ChatScreen() {
     if (!userId || !id) return;
     closePanel();
 
+    console.log('スタンプ送信 conversationId:', id, 'sender_id:', userId, 'sticker:', sticker.emoji);
+
     const temp = makeTempMessage({ message_type: 'sticker', content: sticker.emoji });
     setMessages((prev) => [temp, ...prev]);
     scrollToBottom();
@@ -533,13 +541,16 @@ export default function ChatScreen() {
       .single();
 
     if (!error && msg) {
+      console.log('スタンプ送信成功:', msg.id);
       resolveTemp(temp.id, msg);
       supabase
         .from('conversations')
         .update({ last_message_id: msg.id, last_message_at: msg.created_at })
         .eq('id', id);
     } else {
+      console.error('スタンプエラー:', JSON.stringify(error));
       setMessages((prev) => prev.filter((m) => m.id !== temp.id));
+      Alert.alert('送信エラー', error?.message ?? '不明なエラーが発生しました');
     }
   };
 
