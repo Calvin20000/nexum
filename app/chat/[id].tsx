@@ -56,6 +56,7 @@ export default function ChatScreen() {
   const [otherUser, setOtherUser] = useState<UserProfile | null>(null);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -119,6 +120,11 @@ export default function ChatScreen() {
   }, []);
 
   const userId = session?.user?.id;
+
+  // Debug: log key state on mount
+  useEffect(() => {
+    console.log('[ChatScreen] mount — conversationId:', id, '| userId:', userId, '| session:', !!session);
+  }, [id, userId]);
 
   // With inverted FlatList, offset 0 is always the newest message (visual bottom).
   const scrollToBottom = useCallback((animated = true) => {
@@ -258,7 +264,8 @@ export default function ChatScreen() {
       .eq('id', id)
       .maybeSingle();
     if (!conv) {
-      console.error('会話が見つかりません conversationId:', id);
+      console.error('[fetchData] 会話が見つかりません conversationId:', id, '| userId:', userId);
+      setLoadError(`会話が見つかりません\nID: ${id}\nログインユーザー: ${userId}`);
       setLoading(false);
       return;
     }
@@ -465,11 +472,24 @@ export default function ChatScreen() {
   });
 
   const sendTextMessage = async (content: string) => {
-    if (!content.trim() || !userId || !id || sending) return;
+    if (!content.trim()) return;
+
+    if (!userId) {
+      Alert.alert('未ログイン', 'ログインセッションが切れています。再度ログインしてください。');
+      console.error('[sendTextMessage] userId is null — session:', JSON.stringify(session));
+      return;
+    }
+    if (!id) {
+      Alert.alert('エラー', '会話IDが取得できていません。');
+      console.error('[sendTextMessage] id (conversationId) is null');
+      return;
+    }
+    if (sending) return;
+
     setSending(true);
     clearTyping();
 
-    console.log('送信開始 conversationId:', id, 'sender_id:', userId);
+    console.log('[送信] conversationId:', id, '| sender_id:', userId);
 
     const currentReplyTo = replyTo;
     setReplyTo(null);
@@ -520,10 +540,17 @@ export default function ChatScreen() {
   };
 
   const handleStickerSelect = async (sticker: StickerType) => {
-    if (!userId || !id) return;
+    if (!userId) {
+      Alert.alert('未ログイン', 'ログインセッションが切れています。再度ログインしてください。');
+      return;
+    }
+    if (!id) {
+      Alert.alert('エラー', '会話IDが取得できていません。');
+      return;
+    }
     closePanel();
 
-    console.log('スタンプ送信 conversationId:', id, 'sender_id:', userId, 'sticker:', sticker.emoji);
+    console.log('[スタンプ] conversationId:', id, '| sender_id:', userId, '| emoji:', sticker.emoji);
 
     const temp = makeTempMessage({ message_type: 'sticker', content: sticker.emoji });
     setMessages((prev) => [temp, ...prev]);
@@ -804,6 +831,26 @@ export default function ChatScreen() {
         <SafeAreaView style={styles.safe}>
           <View style={styles.center}>
             <ActivityIndicator size="large" color={C.primary} />
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <View style={[styles.rootWrapper, webStyle]}>
+        <SafeAreaView style={styles.safe}>
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+              <ChevronLeft size={26} color={C.primary} />
+            </TouchableOpacity>
+            <Text style={styles.headerName}>エラー</Text>
+          </View>
+          <View style={styles.center}>
+            <Text style={{ color: '#F44336', fontSize: 14, textAlign: 'center', padding: 24 }}>
+              {loadError}
+            </Text>
           </View>
         </SafeAreaView>
       </View>
