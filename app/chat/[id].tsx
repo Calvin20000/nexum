@@ -57,6 +57,7 @@ export default function ChatScreen() {
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -474,13 +475,15 @@ export default function ChatScreen() {
   const sendTextMessage = async (content: string) => {
     if (!content.trim()) return;
 
+    setSendError(null);
+
     if (!userId) {
-      Alert.alert('未ログイン', 'ログインセッションが切れています。再度ログインしてください。');
+      setSendError('ログインセッションが切れています。再度ログインしてください。');
       console.error('[sendTextMessage] userId is null — session:', JSON.stringify(session));
       return;
     }
     if (!id) {
-      Alert.alert('エラー', '会話IDが取得できていません。');
+      setSendError('会話IDが取得できていません。');
       console.error('[sendTextMessage] id (conversationId) is null');
       return;
     }
@@ -502,31 +505,39 @@ export default function ChatScreen() {
     setMessages((prev) => [temp, ...prev]);
     scrollToBottom();
 
-    const { data: msg, error } = await supabase
-      .from('messages')
-      .insert({
-        conversation_id: id,
-        sender_id: userId,
-        message_type: 'text',
-        content: content.trim(),
-        reply_to_id: currentReplyTo?.id ?? null,
-      })
-      .select()
-      .single();
+    try {
+      const { data: msg, error } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: id,
+          sender_id: userId,
+          message_type: 'text',
+          content: content.trim(),
+          reply_to_id: currentReplyTo?.id ?? null,
+        })
+        .select()
+        .single();
 
-    if (!error && msg) {
-      console.log('送信成功:', msg.id);
-      resolveTemp(temp.id, msg);
-      supabase
-        .from('conversations')
-        .update({ last_message_id: msg.id, last_message_at: msg.created_at })
-        .eq('id', id);
-    } else {
-      console.error('送信エラー:', JSON.stringify(error));
+      if (!error && msg) {
+        console.log('[送信成功]', msg.id);
+        resolveTemp(temp.id, msg);
+        supabase
+          .from('conversations')
+          .update({ last_message_id: msg.id, last_message_at: msg.created_at })
+          .eq('id', id);
+      } else {
+        const errMsg = error?.message ?? '不明なエラーが発生しました';
+        console.error('[送信エラー]', JSON.stringify(error));
+        setMessages((prev) => prev.filter((m) => m.id !== temp.id));
+        setSendError(`送信エラー: ${errMsg}`);
+      }
+    } catch (e: any) {
+      console.error('[送信例外]', e);
       setMessages((prev) => prev.filter((m) => m.id !== temp.id));
-      Alert.alert('送信エラー', error?.message ?? '不明なエラーが発生しました');
+      setSendError(`例外エラー: ${e?.message ?? String(e)}`);
+    } finally {
+      setSending(false);
     }
-    setSending(false);
   };
 
   const handleSend = async () => {
@@ -540,12 +551,14 @@ export default function ChatScreen() {
   };
 
   const handleStickerSelect = async (sticker: StickerType) => {
+    setSendError(null);
+
     if (!userId) {
-      Alert.alert('未ログイン', 'ログインセッションが切れています。再度ログインしてください。');
+      setSendError('ログインセッションが切れています。再度ログインしてください。');
       return;
     }
     if (!id) {
-      Alert.alert('エラー', '会話IDが取得できていません。');
+      setSendError('会話IDが取得できていません。');
       return;
     }
     closePanel();
@@ -556,28 +569,35 @@ export default function ChatScreen() {
     setMessages((prev) => [temp, ...prev]);
     scrollToBottom();
 
-    const { data: msg, error } = await supabase
-      .from('messages')
-      .insert({
-        conversation_id: id,
-        sender_id: userId,
-        message_type: 'sticker',
-        content: sticker.emoji,
-      })
-      .select()
-      .single();
+    try {
+      const { data: msg, error } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: id,
+          sender_id: userId,
+          message_type: 'sticker',
+          content: sticker.emoji,
+        })
+        .select()
+        .single();
 
-    if (!error && msg) {
-      console.log('スタンプ送信成功:', msg.id);
-      resolveTemp(temp.id, msg);
-      supabase
-        .from('conversations')
-        .update({ last_message_id: msg.id, last_message_at: msg.created_at })
-        .eq('id', id);
-    } else {
-      console.error('スタンプエラー:', JSON.stringify(error));
+      if (!error && msg) {
+        console.log('[スタンプ成功]', msg.id);
+        resolveTemp(temp.id, msg);
+        supabase
+          .from('conversations')
+          .update({ last_message_id: msg.id, last_message_at: msg.created_at })
+          .eq('id', id);
+      } else {
+        const errMsg = error?.message ?? '不明なエラーが発生しました';
+        console.error('[スタンプエラー]', JSON.stringify(error));
+        setMessages((prev) => prev.filter((m) => m.id !== temp.id));
+        setSendError(`スタンプエラー: ${errMsg}`);
+      }
+    } catch (e: any) {
+      console.error('[スタンプ例外]', e);
       setMessages((prev) => prev.filter((m) => m.id !== temp.id));
-      Alert.alert('送信エラー', error?.message ?? '不明なエラーが発生しました');
+      setSendError(`例外エラー: ${e?.message ?? String(e)}`);
     }
   };
 
@@ -966,50 +986,61 @@ export default function ChatScreen() {
           )}
 
           <View style={styles.inputBar}>
-            <TouchableOpacity
-              style={[styles.toolBtn, panel === 'sticker' && styles.toolBtnActive]}
-              onPress={() => openPanel('sticker')}
-            >
-              <Sticker size={22} color={panel === 'sticker' ? C.primary : Colors.textMuted} />
-            </TouchableOpacity>
+            {sendError && (
+              <TouchableOpacity
+                style={styles.sendErrorBar}
+                onPress={() => setSendError(null)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.sendErrorText}>{sendError}（タップで閉じる）</Text>
+              </TouchableOpacity>
+            )}
+            <View style={styles.inputRow}>
+              <TouchableOpacity
+                style={[styles.toolBtn, panel === 'sticker' && styles.toolBtnActive]}
+                onPress={() => openPanel('sticker')}
+              >
+                <Sticker size={22} color={panel === 'sticker' ? C.primary : Colors.textMuted} />
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.toolBtn, panel === 'emoji' && styles.toolBtnActive]}
-              onPress={() => openPanel('emoji')}
-            >
-              <Smile size={22} color={panel === 'emoji' ? C.primary : Colors.textMuted} />
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toolBtn, panel === 'emoji' && styles.toolBtnActive]}
+                onPress={() => openPanel('emoji')}
+              >
+                <Smile size={22} color={panel === 'emoji' ? C.primary : Colors.textMuted} />
+              </TouchableOpacity>
 
-            <TouchableOpacity style={styles.toolBtn} onPress={handleImageButtonPress}>
-              <Camera size={22} color={Colors.textMuted} />
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.toolBtn} onPress={handleImageButtonPress}>
+                <Camera size={22} color={Colors.textMuted} />
+              </TouchableOpacity>
 
-            <TextInput
-              ref={inputRef}
-              style={styles.textInput}
-              placeholder="メッセージを入力..."
-              placeholderTextColor={Colors.textMuted}
-              value={text}
-              onChangeText={handleTextChange}
-              multiline
-              maxLength={2000}
-              spellCheck={false}
-              autoCorrect={false}
-              onFocus={() => {
-                closePanel();
-                scrollToBottom();
-              }}
-            />
+              <TextInput
+                ref={inputRef}
+                style={styles.textInput}
+                placeholder="メッセージを入力..."
+                placeholderTextColor={Colors.textMuted}
+                value={text}
+                onChangeText={handleTextChange}
+                multiline
+                maxLength={2000}
+                spellCheck={false}
+                autoCorrect={false}
+                onFocus={() => {
+                  closePanel();
+                  scrollToBottom();
+                }}
+              />
 
-            <TouchableOpacity
-              style={[styles.sendBtn, (!text.trim() || sending) && styles.sendBtnDisabled]}
-              onPress={handleSend}
-              disabled={!text.trim() || sending}
-            >
-              {sending
-                ? <ActivityIndicator size="small" color={Colors.white} />
-                : <Send size={18} color={Colors.white} />}
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sendBtn, (!text.trim() || sending) && styles.sendBtnDisabled]}
+                onPress={handleSend}
+                disabled={!text.trim() || sending}
+              >
+                {sending
+                  ? <ActivityIndicator size="small" color={Colors.white} />
+                  : <Send size={18} color={Colors.white} />}
+              </TouchableOpacity>
+            </View>
           </View>
 
           {panel === 'emoji' && <EmojiPicker onSelect={handleEmojiSelect} />}
@@ -1338,13 +1369,30 @@ const styles = StyleSheet.create({
   dot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: Colors.textMuted },
   typingText: { fontSize: 11, color: Colors.textMuted },
   inputBar: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
+    flexDirection: 'column',
     paddingHorizontal: 8,
     paddingVertical: 8,
     backgroundColor: Colors.white,
     borderTopWidth: 1,
     borderTopColor: Colors.separator,
+  },
+  sendErrorBar: {
+    backgroundColor: '#FFEBEE',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 6,
+    borderLeftWidth: 3,
+    borderLeftColor: '#F44336',
+  },
+  sendErrorText: {
+    color: '#C62828',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     gap: 4,
   },
   toolBtn: {
