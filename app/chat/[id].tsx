@@ -565,7 +565,7 @@ export default function ChatScreen() {
 
     console.log('[スタンプ] conversationId:', id, '| sender_id:', userId, '| emoji:', sticker.emoji);
 
-    const temp = makeTempMessage({ message_type: 'sticker', content: sticker.emoji });
+    const temp = makeTempMessage({ message_type: 'stamp', content: sticker.emoji });
     setMessages((prev) => [temp, ...prev]);
     scrollToBottom();
 
@@ -575,7 +575,7 @@ export default function ChatScreen() {
         .insert({
           conversation_id: id,
           sender_id: userId,
-          message_type: 'sticker',
+          message_type: 'stamp',
           content: sticker.emoji,
         })
         .select()

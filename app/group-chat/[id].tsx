@@ -73,7 +73,7 @@ export default function GroupChatScreen() {
 
   const handleStickerSelect = async (sticker: StickerType) => {
     closePanel();
-    await sendMessage(sticker.emoji, 'sticker');
+    await sendMessage(sticker.emoji, 'stamp');
     scrollToBottom();
   };
 

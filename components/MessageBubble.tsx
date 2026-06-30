@@ -94,7 +94,7 @@ export function MessageBubble({
   }
 
   // Sticker
-  if (message.message_type === 'sticker') {
+  if (message.message_type === 'stamp') {
     return (
       <View style={[styles.row, isOwn ? styles.rowRight : styles.rowLeft]}>
         {!isOwn && showAvatar && (
