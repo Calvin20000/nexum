@@ -19,8 +19,8 @@ SplashScreen.preventAutoHideAsync();
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: false,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
+    shouldPlaySound: false,
+    shouldSetBadge: false,
   }),
 });
 
@@ -84,12 +84,12 @@ export default function RootLayout() {
     if (Platform.OS === 'android') {
       Notifications.setNotificationChannelAsync('messages', {
         name: 'メッセージ通知',
-        importance: Notifications.AndroidImportance.MAX,
+        importance: Notifications.AndroidImportance.LOW,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#1976D2',
         sound: 'default',
         enableVibrate: true,
-        showBadge: true,
+        showBadge: false,
       });
     }
     const channel = supabase.channel("global-messages").on("postgres_changes",{event:"INSERT",schema:"public",table:"messages"},async(payload)=>{const newMsg=payload.new as any;const a=await supabase.auth.getUser();const u=a.data.user;if(!u||newMsg.sender_id===u.id)return;const r=await supabase.from("users").select("display_name,avatar_url").eq("id",newMsg.sender_id).maybeSingle();const s=r.data;notificationRef.current?.show({id:newMsg.id,title:s?.display_name||"NEXUM",body:newMsg.content||"",conversationId:newMsg.conversation_id,avatarUrl:s?.avatar_url??undefined,messageType:newMsg.message_type,messageContent:newMsg.content});}).subscribe();
