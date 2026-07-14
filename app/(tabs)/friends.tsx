@@ -96,6 +96,35 @@ export default function FriendsScreen() {
 
   const [groups, setGroups] = useState<FriendGroup[]>([]);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [groupInvitations, setGroupInvitations] = useState<any[]>([]);
+
+  const fetchGroupInvitations = async () => {
+    if (!session?.user) return;
+    const { data } = await supabase
+      .from('group_invitations' as any)
+      .select('*, group:group_conversations(id, name), inviter:users!inviter_id(id, display_name, avatar_url)')
+      .eq('invitee_id', session.user.id)
+      .eq('status', 'pending');
+    setGroupInvitations((data as any[]) || []);
+  };
+
+  const acceptGroupInvitation = async (inv: any) => {
+    await supabase.from('group_members' as any).insert({
+      group_id: inv.group_id,
+      user_id: session?.user?.id,
+    });
+    await supabase.from('group_invitations' as any)
+      .update({ status: 'accepted' })
+      .eq('id', inv.id);
+    fetchGroupInvitations();
+  };
+
+  const declineGroupInvitation = async (inv: any) => {
+    await supabase.from('group_invitations' as any)
+      .update({ status: 'declined' })
+      .eq('id', inv.id);
+    fetchGroupInvitations();
+  };
   const [groupName, setGroupName] = useState('');
   const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
   const [creatingGroup, setCreatingGroup] = useState(false);
@@ -184,8 +213,24 @@ export default function FriendsScreen() {
   useEffect(() => {
     fetchFriends();
     fetchGroups();
+    fetchGroupInvitations();
   }, [fetchFriends, fetchGroups]);
-
+// グループ招待のRealtime監視
+  useEffect(() => {
+    if (!session?.user) return;
+    const channel = supabase
+      .channel('group-invitations')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'group_invitations',
+        filter: `invitee_id=eq.${session.user.id}`,
+      }, () => {
+        fetchGroupInvitations();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [session?.user?.id]);
   const createGroup = async () => {
     if (!groupName.trim() || !session?.user) return;
     setCreatingGroup(true);
@@ -281,10 +326,19 @@ export default function FriendsScreen() {
       return;
     }
 
-    const allIds = [...new Set([userId, ...members.map((m) => m.id)])];
-    await (supabase.from('group_members' as any) as any).insert(
-      allIds.map((uid) => ({ group_id: (gc as any).id, user_id: uid }))
-    );
+    await (supabase.from('group_members' as any) as any).insert([
+      { group_id: (gc as any).id, user_id: userId }
+    ]);
+    const otherIds = members.map((m) => m.id).filter((id) => id !== userId);
+    if (otherIds.length > 0) {
+      await (supabase.from('group_invitations' as any) as any).insert(
+        otherIds.map((uid) => ({
+          group_id: (gc as any).id,
+          inviter_id: userId,
+          invitee_id: uid,
+        }))
+      );
+    }
 
     setSelectedGroup(null);
     router.push(`/group-chat/${(gc as any).id}`);
@@ -489,6 +543,40 @@ export default function FriendsScreen() {
         </View>
       </Modal>
 
+      {/* グループ招待一覧 */}
+      {groupInvitations.length > 0 && (
+        <View style={styles.inviteSection}>
+          <Text style={styles.inviteTitle}>
+            グループ招待
+          </Text>
+          {groupInvitations.map((inv) => (
+            <View key={inv.id} style={styles.inviteItem}>
+              <View style={styles.inviteInfo}>
+                <Text style={styles.inviteGroupName}>
+                  {inv.group?.name}
+                </Text>
+                <Text style={styles.inviteFrom}>
+                  {inv.inviter?.display_name}から招待
+                </Text>
+              </View>
+              <View style={styles.inviteBtns}>
+                <TouchableOpacity
+                  style={styles.acceptBtn}
+                  onPress={() => acceptGroupInvitation(inv)}
+                >
+                  <Text style={styles.acceptText}>承認</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.declineBtn}
+                  onPress={() => declineGroupInvitation(inv)}
+                >
+                  <Text style={styles.declineText}>拒否</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
       {/* グループ作成モーダル */}
       <Modal visible={showCreateGroup} animationType="slide" transparent onRequestClose={() => setShowCreateGroup(false)}>
         <View style={styles.modalOverlay}>
@@ -682,7 +770,64 @@ const styles = StyleSheet.create({
   },
   sectionLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   sectionLabel: { fontSize: 12, fontWeight: '700', color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 1 },
-  createGroupBtn: {
+  inviteSection: {
+    backgroundColor: '#E3F2FD',
+    margin: 12,
+    borderRadius: 12,
+    padding: 12,
+  },
+  inviteTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0D47A1',
+    marginBottom: 8,
+  },
+  inviteItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#BBDEFB',
+  },
+  inviteInfo: {
+    flex: 1,
+  },
+  inviteGroupName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#212121',
+  },
+  inviteFrom: {
+    fontSize: 13,
+    color: '#757575',
+  },
+  inviteBtns: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  acceptBtn: {
+    backgroundColor: '#1976D2',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  acceptText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  declineBtn: {
+    backgroundColor: '#F5F5F5',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  declineText: {
+    color: '#757575',
+    fontSize: 14,
+    fontWeight: '600',
+  },createGroupBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5,
   },
