@@ -117,6 +117,8 @@ export default function FriendsScreen() {
       .update({ status: 'accepted' })
       .eq('id', inv.id);
     fetchGroupInvitations();
+    fetchGroups();
+    router.push(`/group-chat/${inv.group_id}`);
   };
 
   const declineGroupInvitation = async (inv: any) => {
