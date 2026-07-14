@@ -277,7 +277,7 @@ export default function FriendsScreen() {
       .single();
 
     if (error || !gc) {
-      Alert.alert('エラー', 'グループチャットの作成に失敗しました。');
+      console.error("GC error:", JSON.stringify(error));      Alert.alert('エラー', 'グループチャットの作成に失敗しました。');
       return;
     }
 
