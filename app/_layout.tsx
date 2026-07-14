@@ -92,44 +92,8 @@ export default function RootLayout() {
         showBadge: true,
       });
     }
-
-    // フォアグラウンド中に通知を受信 → インアプリ通知を表示
-    const receivedSub = Notifications.addNotificationReceivedListener((notification) => {
-      const { title, body, data } = notification.request.content;
-      const conversationId = data?.conversationId as string | undefined;
-      const senderId = data?.senderId as string | undefined;
-      const messageType = data?.messageType as string | undefined;
-      const messageContent = data?.messageContent as string | undefined;
-      if (conversationId) {
-        if (senderId) {
-          supabase
-            .from('users')
-            .select('display_name, avatar_url')
-            .eq('id', senderId)
-            .maybeSingle()
-            .then(({ data: user }) => {
-              notificationRef.current?.show({
-                id: notification.request.identifier,
-                title: user?.display_name || title || 'NEXUM',
-                body: body || '',
-                conversationId,
-                avatarUrl: user?.avatar_url ?? undefined,
-                messageType,
-                messageContent,
-              });
-            });
-        } else {
-          notificationRef.current?.show({
-            id: notification.request.identifier,
-            title: title || 'NEXUM',
-            body: body || '',
-            conversationId,
-            messageType,
-            messageContent,
-          });
-        }
-      }
-    });
+    const channel = supabase.channel("global-messages").on("postgres_changes",{event:"INSERT",schema:"public",table:"messages"},async(payload)=>{const newMsg=payload.new as any;const a=await supabase.auth.getUser();const u=a.data.user;if(!u||newMsg.sender_id===u.id)return;const r=await supabase.from("users").select("display_name,avatar_url").eq("id",newMsg.sender_id).maybeSingle();const s=r.data;notificationRef.current?.show({id:newMsg.id,title:s?.display_name||"NEXUM",body:newMsg.content||"",conversationId:newMsg.conversation_id,avatarUrl:s?.avatar_url??undefined,messageType:newMsg.message_type,messageContent:newMsg.content});}).subscribe();
+    const receivedSub=Notifications.addNotificationReceivedListener(()=>{});
 
     // 通知バナーをタップ（バックグラウンド・終了時）→ チャット画面へ遷移
     const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
@@ -142,6 +106,7 @@ export default function RootLayout() {
 
     return () => {
       receivedSub.remove();
+      supabase.removeChannel(channel);
       responseSub.remove();
     };
   }, []);
