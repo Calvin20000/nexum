@@ -19,12 +19,14 @@ export function useGroupConversations(userId: string | undefined) {
       .select('group_id, last_read_at')
       .eq('user_id', userId);
 
+    console.log("memberRows:", JSON.stringify(memberRows));
     if (!memberRows || memberRows.length === 0) {
-      setGroups([]);
+      console.log("count:",gcData?.length);    setGroups([]);
       setLoading(false);
       return;
     }
 
+    console.log("groupIds:",memberRows?.length);
     const groupIds = (memberRows as any[]).map((r: any) => r.group_id);
     const readMap: Record<string, string | null> = {};
     (memberRows as any[]).forEach((r: any) => { readMap[r.group_id] = r.last_read_at; });

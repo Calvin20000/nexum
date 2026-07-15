@@ -118,6 +118,21 @@ export default function ChatsScreen() {
       if (val !== null) setPreviewEnabled(val !== 'false');
     });
   }, []);
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel('group-members-changes')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'group_members',
+        filter: `user_id=eq.${userId}`,
+      }, () => {
+        refetchGroups();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [userId]);
 
   const fetchDMs = useCallback(async () => {
     if (!userId) return;

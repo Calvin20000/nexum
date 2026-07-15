@@ -318,8 +318,20 @@ export default function FriendsScreen() {
       return;
     }
 
-    const { data: gc, error } = await (supabase.from('group_conversations' as any) as any)
-      .insert({ name: group.name, owner_id: userId })
+// 既存のグループチャットを確認
+    const { data: existing } = await (supabase
+      .from('group_conversations' as any) as any)
+      .select('id')
+      .eq('friend_group_id', group.id)
+      .maybeSingle();
+
+    if (existing) {
+      setSelectedGroup(null);
+      router.push(`/group-chat/${(existing as any).id}`);
+      return;
+    }
+  　const { data: gc, error } = await (supabase.from('group_conversations' as any) as any)
+      .insert({ name: group.name, owner_id: userId, friend_group_id: group.id })
       .select()
       .single();
 
