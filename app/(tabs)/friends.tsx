@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import * as ImagePicker from 'expo-image-picker';
 import {
   View,
   Text,
@@ -653,7 +654,50 @@ export default function FriendsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{selectedGroup?.name}</Text>
+              {/* グループアバター */}
+            <TouchableOpacity
+              style={styles.groupAvatarWrapper}
+              onPress={async () => {
+                const result = await ImagePicker.launchImageLibraryAsync({
+                  mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                  allowsEditing: true,
+                  aspect: [1, 1],
+                  quality: 0.8,
+                });
+                if (!result.canceled && result.assets[0]) {
+                  const uri = result.assets[0].uri;
+                  const ext = uri.split('.').pop() || 'jpg';
+                  const path = `groups/${selectedGroup?.id}/avatar.${ext}`;
+                  const mimeType = `image/${ext}`;
+                  try {
+                    const publicUrl = await uploadImageToStorage(uri, 'avatars', path, mimeType);
+                    await (supabase.from('group_conversations' as any) as any)
+                      .update({ avatar_url: publicUrl })
+                      .eq('friend_group_id', selectedGroup?.id);
+                    Alert.alert('完了', 'グループアバターを更新しました');
+                    fetchGroups();
+                  } catch (e) {
+                    Alert.alert('エラー', 'アバターの更新に失敗しました');
+                  }
+                }
+              }}
+            >
+              {selectedGroup?.gcAvatarUrl ? (
+                <Image
+                  source={{ uri: selectedGroup.gcAvatarUrl }}
+                  style={styles.groupAvatar}
+                />
+              ) : (
+                <View style={styles.groupAvatarFallback}>
+                  <Text style={styles.groupAvatarText}>
+                    {selectedGroup?.name?.charAt(0) || '👥'}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.groupAvatarEdit}>
+                <Text style={{ color: '#FFFFFF', fontSize: 10 }}>編集</Text>
+              </View>
+            </TouchableOpacity><Text style={styles.modalTitle}>{selectedGroup?.name}</Text>
               <TouchableOpacity onPress={() => { setSelectedGroup(null); setShowAddMemberModal(false); }}>
                 <X size={22} color={Colors.textSecondary} />
               </TouchableOpacity>
@@ -897,6 +941,38 @@ const styles = StyleSheet.create({
   memberName: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
   memberHandle: { fontSize: 12, color: Colors.textMuted },
   noMembersText: { fontSize: 14, color: Colors.textMuted, textAlign: 'center', paddingVertical: 16 },
+  groupAvatarWrapper: {
+    alignSelf: 'center',
+    marginVertical: 12,
+    position: 'relative',
+  },
+  groupAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  groupAvatarFallback: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  groupAvatarText: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#1976D2',
+  },
+  groupAvatarEdit: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#1976D2',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
   removeMemberBtn: { padding: 6 },
   addMemberBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
