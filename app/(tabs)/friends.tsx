@@ -173,12 +173,33 @@ export default function FriendsScreen() {
   const fetchGroups = useCallback(async () => {
     if (!session?.user) return;
     const userId = session.user.id;
-    const { data: groupData } = await supabase
+   const { data: ownGroups } = await supabase
       .from('friend_groups')
       .select('*')
       .eq('owner_id', userId)
       .order('created_at', { ascending: false });
+    const { data: memberGroupIds } = await supabase
+      .from('friend_group_members')
+      .select('group_id')
+      .eq('user_id', userId);
+    console.log("mgi:",JSON.stringify(memberGroupIds));    const ids = (memberGroupIds ?? []).map((m: any) => m.group_id);
+    let memberGroups: any[] = [];
+    if (ids.length > 0) {
+      const { data } = await supabase
+        .from('friend_groups')
+        .select('*')
+        .in('id', ids)
+        .order('created_at', { ascending: false });
+      memberGroups = data ?? [];
+    }
+    const seen = new Set();
+    const groupData = [...(ownGroups ?? []), ...memberGroups].filter((g) => {
+      if (seen.has(g.id)) return false;
+      seen.add(g.id);
+      return true;
+    });
 
+    console.log("ownGroups:", ownGroups?.length, "memberGroups:", memberGroups?.length, "groupData:", groupData?.length);
     if (!groupData) return;
     const withMembers = await Promise.all(
       (groupData as any[]).map(async (g) => {

@@ -48,7 +48,7 @@ function AuthGuard() {
         setTimeout(() => {
           fetchProfile(newSession.user.id);
           supabase.from('users').update({ is_online: true }).eq('id', newSession.user.id);
-          registerPushToken(newSession.user.id);
+          // registerPushToken(newSession.user.id);
         }, 0);
       }
     });
@@ -81,7 +81,9 @@ export default function RootLayout() {
 
   useEffect(() => {
     // Android: メッセージ用通知チャンネルを作成
+    Notifications.deleteNotificationChannelAsync('messages').catch(() => {});
     if (Platform.OS === 'android') {
+      Notifications.deleteNotificationChannelAsync('messages').catch(() => {});
       Notifications.setNotificationChannelAsync('messages', {
         name: 'メッセージ通知',
         importance: Notifications.AndroidImportance.LOW,
