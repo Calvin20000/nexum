@@ -132,7 +132,11 @@ export const InAppNotification = forwardRef<InAppNotificationRef>((_props, ref) 
 
         {/* テキストエリア */}
         <View style={styles.textArea}>
-          <Text style={styles.senderName} numberOfLines={1}>
+          {notification.isGroup && notification.groupName && (
+            <Text style={styles.groupName} numberOfLines={1}>
+              {notification.groupName}
+            </Text>
+          )}<Text style={styles.senderName} numberOfLines={1}>
             {notification.title}
           </Text>
           <Text style={styles.preview} numberOfLines={2}>
@@ -212,6 +216,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  closeBtn: { paddingLeft: 4 },
+  groupNameText: { fontSize: 12, color: "#757575", fontWeight: "400" },
+  groupName: { fontSize: 11, color: '#1976D2', fontWeight: '600', marginBottom: 1 },closeBtn: { paddingLeft: 4 },
   closeIcon: { color: '#9E9E9E', fontSize: 14, fontWeight: '600' },
 });

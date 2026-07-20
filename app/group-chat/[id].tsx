@@ -17,8 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { ChevronLeft, Send, Users, Smile, Sticker, ImageIcon } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { useAuthStore } from '@/stores/authStore';
 import { GroupMessage } from '@/types/database';
+import { useAuthStore } from '@/stores/authStore';
 import { useGroupChatMessages } from '@/hooks/useGroupChat';
 import { Avatar } from '@/components/Avatar';
 import { EmojiPicker } from '@/components/EmojiPicker';
@@ -245,9 +245,13 @@ export default function GroupChatScreen() {
           onPress={() => setShowMembers((v) => !v)}
           activeOpacity={0.7}
         >
-          <View style={[styles.groupAvatar, { backgroundColor: C.surface }]}>
-            <Users size={18} color={C.primary} />
-          </View>
+          {groupConv?.avatar_url ? (
+            <Image source={{ uri: groupConv.avatar_url }} style={styles.groupAvatar} />
+          ) : (
+            <View style={[styles.groupAvatar, { backgroundColor: C.surface }]}>
+              <Users size={18} color={C.primary} />
+            </View>
+          )}
           <View>
             <Text style={styles.headerName} numberOfLines={1}>{groupConv?.name}</Text>
             <Text style={styles.headerSub}>{members.length}人のメンバー</Text>
