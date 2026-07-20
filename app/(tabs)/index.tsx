@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   Animated,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -195,11 +196,12 @@ export default function ChatsScreen() {
     ...dmItems.map((d) => ({ type: 'dm' as const, data: d })),
     ...groups.map((g) => ({ type: 'group' as const, data: g })),
   ].sort((a, b) => {
-    const aTime = a.data.last_message_at ?? '';
-    const bTime = b.data.last_message_at ?? '';
+    const aTime = a.data.last_message_at ?? '1970-01-01';
+    const bTime = b.data.last_message_at ?? '1970-01-01';
     return new Date(bTime).getTime() - new Date(aTime).getTime();
   });
 
+  console.log("sorted:", chatItems.map(i=>({t:i.type,time:i.data.last_message_at})));
   const loading = dmLoading || groupsLoading;
 
   if (loading) {
@@ -270,9 +272,13 @@ export default function ChatsScreen() {
                 activeOpacity={0.7}
               >
                 <View style={gcStyles.avatarWrapper}>
-                  <View style={[gcStyles.avatar, { backgroundColor: '#E3F2FD' }]}>
-                    <Text style={gcStyles.avatarEmoji}>👥</Text>
-                  </View>
+                  {gc.avatar_url ? (
+                    <Image source={{ uri: gc.avatar_url }} style={gcStyles.avatar} />
+                  ) : (
+                    <View style={[gcStyles.avatar, { backgroundColor: '#E3F2FD' }]}>
+                      <Text style={gcStyles.avatarEmoji}>👥</Text>
+                    </View>
+                  )}
                   {gc.unread_count > 0 && (
                     <View style={gcStyles.unreadBadge}>
                       <Text style={gcStyles.unreadText}>

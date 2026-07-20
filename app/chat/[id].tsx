@@ -521,7 +521,7 @@ export default function ChatScreen() {
       if (!error && msg) {
         console.log('[送信成功]', msg.id);
         resolveTemp(temp.id, msg);
-        supabase
+        await supabase
           .from('conversations')
           .update({ last_message_id: msg.id, last_message_at: msg.created_at })
           .eq('id', id);
@@ -584,7 +584,7 @@ export default function ChatScreen() {
       if (!error && msg) {
         console.log('[スタンプ成功]', msg.id);
         resolveTemp(temp.id, msg);
-        supabase
+        await supabase
           .from('conversations')
           .update({ last_message_id: msg.id, last_message_at: msg.created_at })
           .eq('id', id);

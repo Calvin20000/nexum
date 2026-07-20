@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { uploadImageToStorage } from '@/lib/imageUpload';
 import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'react-native';
 import {
   View,
   Text,
@@ -213,7 +215,11 @@ export default function FriendsScreen() {
           const { data: users } = await supabase.from('users').select('*').in('id', memberIds);
           members = (users ?? []) as UserProfile[];
         }
-        return { ...g, members };
+        const { data: gc } = await (supabase.from('group_conversations' as any) as any)
+          .select('id, avatar_url')
+          .eq('friend_group_id', g.id)
+          .maybeSingle();
+        return { ...g, members, avatar_url: gc?.avatar_url ?? null };
       })
     );
     setGroups(withMembers);
@@ -456,7 +462,7 @@ export default function FriendsScreen() {
           ) : (
             groups.map((group) => (
               <TouchableOpacity key={group.id} style={styles.groupItem} onPress={() => setSelectedGroup(group)} activeOpacity={0.7}>
-                <View style={styles.groupIcon}><Users size={18} color={C.primary} /></View>
+                <View style={styles.groupIcon}>{(group as any).avatar_url ? <Image source={{ uri: (group as any).avatar_url }} style={{ width: 44, height: 44, borderRadius: 22 }} /> : <Users size={18} color={C.primary} />}</View>
                 <View style={styles.groupInfo}>
                   <Text style={styles.groupName}>{group.name}</Text>
                   <Text style={styles.groupMemberCount}>{group.members?.length ?? 0}人のメンバー</Text>
@@ -695,17 +701,19 @@ export default function FriendsScreen() {
                     await (supabase.from('group_conversations' as any) as any)
                       .update({ avatar_url: publicUrl })
                       .eq('friend_group_id', selectedGroup?.id);
+                    await fetchGroups();
+                    setSelectedGroup((prev: any) => prev ? {...prev, avatar_url: publicUrl} : prev);
                     Alert.alert('完了', 'グループアバターを更新しました');
-                    fetchGroups();
                   } catch (e) {
-                    Alert.alert('エラー', 'アバターの更新に失敗しました');
+                    console.error('アバターエラー:', e);
+                    Alert.alert('エラー', String(e));
                   }
                 }
               }}
             >
-              {selectedGroup?.gcAvatarUrl ? (
+              {(selectedGroup as any)?.avatar_url ? (
                 <Image
-                  source={{ uri: selectedGroup.gcAvatarUrl }}
+                  source={{ uri: (selectedGroup as any).avatar_url }}
                   style={styles.groupAvatar}
                 />
               ) : (

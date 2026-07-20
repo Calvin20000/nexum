@@ -93,7 +93,12 @@ export const InAppNotification = forwardRef<InAppNotificationRef>((_props, ref) 
 
   const handleTap = () => {
     hide();
-    router.push(`/chat/${notification.conversationId}` as any);
+    const isGroup = notification.isGroup;
+    if (isGroup) {
+      router.push(`/group-chat/${notification.conversationId}` as any);
+    } else {
+      router.push(`/chat/${notification.conversationId}` as any);
+    }
   };
 
   const initial = notification.title.charAt(0).toUpperCase() || '?';
