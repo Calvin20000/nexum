@@ -301,6 +301,7 @@ export default function ChatScreen() {
     setLoading(false);
 
     const unread = (msgs ?? []).filter((m) => m.sender_id !== userId && !m.read_at);
+    console.log("unread count:", unread.length, "userId:", userId);
     if (unread.length > 0) {
       await supabase
         .from('messages')

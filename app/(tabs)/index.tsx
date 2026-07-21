@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+{gc.unread_count > 0 && (
+                <View style={gcStyles.unreadBadge}>
+                  <Text style={gcStyles.unreadText}>
+                    {gc.unread_count > 99 ? '99+' : gc.unread_count}
+                  </Text>
+                </View>
+              )}import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,7 +16,7 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Edit3 } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
@@ -186,6 +192,17 @@ export default function ChatsScreen() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchDMs, userId]);
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchDMs();
+      refetchGroups();
+      const timer = setTimeout(() => {
+        fetchDMs();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }, [fetchDMs, refetchGroups])
+  );
+
   const onRefresh = () => {
     setRefreshing(true);
     fetchDMs();
@@ -201,7 +218,7 @@ export default function ChatsScreen() {
     return new Date(bTime).getTime() - new Date(aTime).getTime();
   });
 
-  console.log("sorted:", chatItems.map(i=>({t:i.type,time:i.data.last_message_at})));
+  const uniqueChatItems = chatItems.filter((item, index, self) => self.findIndex(i => i.type === item.type && i.data.id === item.data.id) === index);
   const loading = dmLoading || groupsLoading;
 
   if (loading) {
@@ -237,7 +254,7 @@ export default function ChatsScreen() {
         </View>
       ) : (
         <FlatList
-          data={chatItems}
+          data={uniqueChatItems}
           keyExtractor={(item) => item.type + '_' + item.data.id}
           renderItem={({ item }) => {
             if (item.type === 'dm') {
@@ -279,13 +296,7 @@ export default function ChatsScreen() {
                       <Text style={gcStyles.avatarEmoji}>👥</Text>
                     </View>
                   )}
-                  {gc.unread_count > 0 && (
-                    <View style={gcStyles.unreadBadge}>
-                      <Text style={gcStyles.unreadText}>
-                        {gc.unread_count > 99 ? '99+' : gc.unread_count}
-                      </Text>
-                    </View>
-                  )}
+                  
                 </View>
                 <View style={gcStyles.content}>
                   <View style={gcStyles.topRow}>
@@ -308,7 +319,13 @@ export default function ChatsScreen() {
                     </Text>
                   </View>
                 </View>
-              </TouchableOpacity>
+              {gc.unread_count > 0 && (
+                <View style={gcStyles.unreadBadge}>
+                  <Text style={gcStyles.unreadText}>
+                    {gc.unread_count > 99 ? '99+' : gc.unread_count}
+                  </Text>
+                </View>
+              )}</TouchableOpacity>
             );
           }}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -369,18 +386,14 @@ const gcStyles = StyleSheet.create({
   },
   avatarEmoji: { fontSize: 26 },
   unreadBadge: {
-    position: 'absolute',
-    top: -2,
-    right: -4,
-    backgroundColor: Colors.error,
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    alignItems: 'center',
+    backgroundColor: '#1976D2',
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
     justifyContent: 'center',
-    paddingHorizontal: 4,
-    borderWidth: 2,
-    borderColor: Colors.white,
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    flexShrink: 0,
   },
   unreadText: { color: Colors.white, fontSize: 10, fontWeight: '700' },
   content: { flex: 1, gap: 4 },
