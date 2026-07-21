@@ -95,8 +95,14 @@ export function useGroupConversations(userId: string | undefined) {
         event: 'INSERT',
         schema: 'public',
         table: 'group_messages',
-      }, () => {
-        fetchGroups();
+      }, (payload) => {
+        const newMsg = payload.new as any;
+        if (newMsg.sender_id === userId) return;
+        setGroups((prev) => prev.map((g) => 
+          g.id === newMsg.group_id 
+            ? { ...g, unread_count: (g.unread_count || 0) + 1, last_message_at: newMsg.created_at }
+            : g
+        ));
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };

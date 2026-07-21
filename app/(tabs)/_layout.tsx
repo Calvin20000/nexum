@@ -31,7 +31,26 @@ function useUnreadCount() {
       .neq('sender_id', userId)
       .in('conversation_id', convIds);
 
-    setCount(unread || 0);
+    const { data: groupMembers } = await supabase
+      .from('group_members')
+      .select('group_id, last_read_at')
+      .eq('user_id', userId);
+    let groupUnread = 0;
+    if (groupMembers && groupMembers.length > 0) {
+      for (const gm of groupMembers) {
+        const query = supabase
+          .from('group_messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('group_id', gm.group_id)
+          .neq('sender_id', userId);
+        if (gm.last_read_at) {
+          query.gt('created_at', gm.last_read_at);
+        }
+        const { count: gc } = await query;
+        groupUnread += gc || 0;
+      }
+    }
+    setCount((unread || 0) + groupUnread);
   };
 
   useEffect(() => {
@@ -41,6 +60,7 @@ function useUnreadCount() {
     const channel = supabase
       .channel('unread_count_watch')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, refresh)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages' }, refresh)
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -94,7 +114,7 @@ export default function TabsLayout() {
           title: 'チャット',
           tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : undefined,
           tabBarBadgeStyle: {
-            backgroundColor: '#1976D2',
+            backgroundColor: '#F44336',
             fontSize: 11,
             fontWeight: '700',
             minWidth: 18,
