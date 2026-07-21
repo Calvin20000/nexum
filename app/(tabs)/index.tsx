@@ -214,10 +214,14 @@ export default function ChatsScreen() {
     ...groups.map((g) => ({ type: 'group' as const, data: g })),
   ].sort((a, b) => {
     const aTime = a.data.last_message_at ?? '1970-01-01';
+     if (!a.data.last_message_at) return 1;
+    if (!b.data.last_message_at) return -1;
     const bTime = b.data.last_message_at ?? '1970-01-01';
     return new Date(bTime).getTime() - new Date(aTime).getTime();
   });
 
+  console.log("dm times:", dmItems.map(d=>d.last_message_at));
+  console.log("group times:", groups.map(g=>g.last_message_at));
   const uniqueChatItems = chatItems.filter((item, index, self) => self.findIndex(i => i.type === item.type && i.data.id === item.data.id) === index);
   const loading = dmLoading || groupsLoading;
 

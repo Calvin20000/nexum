@@ -87,6 +87,20 @@ export function useGroupConversations(userId: string | undefined) {
     fetchGroups();
   }, [fetchGroups]);
 
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel('group-messages-unread')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'group_messages',
+      }, () => {
+        fetchGroups();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [userId, fetchGroups]);
   return { groups, loading, refetch: fetchGroups };
 }
 
@@ -225,7 +239,7 @@ export function useGroupChatMessages(groupId: string, userId: string | undefined
           ? prev.filter((m) => m.id !== tempId)
           : prev.map((m) => m.id === tempId ? msg as GroupMessage : m)
       );
-      (supabase.from('group_conversations' as any) as any)
+      await (supabase.from('group_conversations' as any) as any)
         .update({ last_message_at: (msg as GroupMessage).created_at })
         .eq('id', groupId);
     } else {
