@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -42,12 +42,13 @@ export default function GroupChatScreen() {
   const userId = session?.user?.id;
 
   const {
-    groupConv, members, messages, senderMap,
+    groupConv, members, messages, senderMap, memberReadMap,
     loading, sending, isLoadingMore, hasMore,
-    sendMessage, deleteMessage, loadMore,
+    sendMessage, deleteMessage, loadMore, markAsRead, setMessages,
   } = useGroupChatMessages(id as string, userId);
 
   const [text, setText] = useState('');
+  useEffect(() => { markAsRead(); }, [messages]);
   const [panel, setPanel] = useState<PanelType>('none');
   const [showMembers, setShowMembers] = useState(false);
 
@@ -98,6 +99,7 @@ export default function GroupChatScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
       quality: 0.8,
     });
     if (result.canceled || !result.assets[0]) return;
@@ -111,14 +113,21 @@ export default function GroupChatScreen() {
     const path = `group/${id}/${Date.now()}.${ext}`;
     try {
       const publicUrl = await uploadImageToStorage(uri, 'chats', path, mimeType);
-      await (supabase.from('group_messages' as any) as any).insert({
+      const { data: newMsg } = await (supabase.from('group_messages' as any) as any).insert({
         group_id: id,
         sender_id: userId,
         message_type: 'image',
         image_url: publicUrl,
-      });
+      }).select().single();
+      if (newMsg) {
+        setMessages((prev: any[]) => [newMsg, ...prev]);
+        await (supabase.from('group_conversations' as any) as any)
+          .update({ last_message_at: (newMsg as any).created_at })
+          .eq('id', id);
+      }
     } catch (e) {
-      Alert.alert('エラー', '画像の送信に失敗しました');
+      console.error('画像送信エラー:', e);
+      Alert.alert('エラー', String(e));
     }
   };
 
@@ -163,11 +172,16 @@ export default function GroupChatScreen() {
               </Text>
             )}
             <Text style={styles.sticker}>{item.content}</Text>
+            {isOwn && Object.entries(memberReadMap ?? {}).some(([uid, readAt]) =>
+              uid !== userId && readAt &&
+              new Date(readAt) >= new Date(item.created_at)
+            ) && (
+              <Text style={[styles.timeLabel, { color: C.primary, marginRight: 4 }]}>既読</Text>
+            )}
           </View>
         </View>
       );
     }
-
     if (item.message_type === 'image' && item.image_url) {
       return (
         <View style={[styles.msgRow, isOwn ? styles.msgRowOwn : styles.msgRowOther]}>
@@ -185,7 +199,13 @@ export default function GroupChatScreen() {
             <TouchableOpacity onLongPress={() => handleDeleteMessage(item)} activeOpacity={0.9}>
               <Image source={{ uri: item.image_url }} style={styles.imageBubble} resizeMode="cover" />
             </TouchableOpacity>
-            <Text style={[styles.timeLabel, isOwn ? styles.timeLabelOwn : styles.timeLabelOther]}>
+            {isOwn && Object.entries(memberReadMap).some(([uid, readAt]) => 
+  uid !== userId && readAt && 
+  new Date(readAt) >= new Date(item.created_at)
+) && (
+  <Text style={[styles.timeLabel, { color: C.primary, marginRight: 4 }]}>既読</Text>
+)}
+<Text style={[styles.timeLabel, isOwn ? styles.timeLabelOwn : styles.timeLabelOther]}>
               {formatTime(item.created_at)}
             </Text>
           </View>
@@ -216,13 +236,17 @@ export default function GroupChatScreen() {
               </Text>
             </View>
           </TouchableOpacity>
-          <Text style={[styles.timeLabel, isOwn ? styles.timeLabelOwn : styles.timeLabelOther]}>
-            {formatTime(item.created_at)}
-          </Text>
+          {/* debug: {JSON.stringify(memberReadMap)} */}
+          {isOwn && (() => { const result = Object.entries(memberReadMap ?? {}).some(([uid, readAt]) => uid !== userId && readAt && new Date(readAt) >= new Date(item.created_at)); if (isOwn) console.log("既読判定:", result, "memberReadMap:", JSON.stringify(memberReadMap), "created_at:", item.created_at); return result; })() && (
+  <Text style={[styles.timeLabel, { color: C.primary, marginRight: 4 }]}>既読</Text>
+)}
+<Text style={[styles.timeLabel, isOwn ? styles.timeLabelOwn : styles.timeLabelOther]}>
+  {formatTime(item.created_at)}
+</Text>
         </View>
       </View>
     );
-  }, [userId, senderMap, messages, C.primary]);
+  }, [userId, senderMap, messages, C.primary, memberReadMap]);
 
   if (loading) {
     return (
@@ -432,7 +456,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   deletedText: { fontSize: 13, color: Colors.textMuted, fontStyle: 'italic' },
-  sticker: { fontSize: 44, lineHeight: 52 },
+  sticker: { fontSize: 72, lineHeight: 84 },
   imageBubble: { width: 200, height: 200, borderRadius: 14 },
   inputBar: {
     flexDirection: 'row',

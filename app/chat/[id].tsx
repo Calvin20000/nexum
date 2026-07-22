@@ -122,10 +122,7 @@ export default function ChatScreen() {
 
   const userId = session?.user?.id;
 
-  // Debug: log key state on mount
-  useEffect(() => {
-    console.log('[ChatScreen] mount — conversationId:', id, '| userId:', userId, '| session:', !!session);
-  }, [id, userId]);
+
 
   // With inverted FlatList, offset 0 is always the newest message (visual bottom).
   const scrollToBottom = useCallback((animated = true) => {
@@ -258,12 +255,12 @@ export default function ChatScreen() {
 
   const fetchData = useCallback(async () => {
     if (!id || !userId) return;
+    const [{ data: conv }, { data: msgs }] = await Promise.all([
+      supabase.from('conversations').select('*').eq('id', id).maybeSingle(),
+      supabase.from('messages').select('*').eq('conversation_id', id)
+        .order('created_at', { ascending: false }).limit(PAGE_SIZE),
+    ]);
 
-    const { data: conv } = await supabase
-      .from('conversations')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
     if (!conv) {
       console.error('[fetchData] 会話が見つかりません conversationId:', id, '| userId:', userId);
       setLoadError(`会話が見つかりません\nID: ${id}\nログインユーザー: ${userId}`);
@@ -274,19 +271,15 @@ export default function ChatScreen() {
     const otherId =
       conv.participant_1_id === userId ? conv.participant_2_id : conv.participant_1_id;
 
-    const [{ data: other }, { data: msgs }] = await Promise.all([
-      supabase.from('users').select('*').eq('id', otherId).maybeSingle(),
-      supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation_id', id)
-        .order('created_at', { ascending: false }) // descending: newest first for inverted list
-        .limit(PAGE_SIZE),
-    ]);
-
+      const { data: other } = await supabase.from('users').select('*').eq('id', otherId).maybeSingle();
     setOtherUser(other);
     setHasMore((msgs?.length ?? 0) === PAGE_SIZE);
-
+    setMessages(msgs ?? []);
+    // 未読数を即時カウントダウン
+    const unreadNow = (msgs ?? []).filter((m: any) => m.sender_id !== userId && !m.read_at).length;
+    if (unreadNow > 0 && (global as any).__setUnreadCount) {
+      (global as any).__setUnreadCount((c: number) => Math.max(0, c - unreadNow));
+    }
     const userIds = [...new Set((msgs ?? []).map((m) => m.sender_id))];
     const { data: senders } = await supabase
       .from('users')
@@ -301,7 +294,11 @@ export default function ChatScreen() {
     setLoading(false);
 
     const unread = (msgs ?? []).filter((m) => m.sender_id !== userId && !m.read_at);
-    console.log("unread count:", unread.length, "userId:", userId);
+    if (unread.length > 0) {
+      // タブバッジを即時減算
+      const event = new Event("chatRead");
+      (global as any).__chatReadCount = ((global as any).__chatReadCount || 0) + unread.length;
+    }
     if (unread.length > 0) {
       await supabase
         .from('messages')

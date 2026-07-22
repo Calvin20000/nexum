@@ -107,12 +107,17 @@ export function useGroupConversations(userId: string | undefined) {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [userId, fetchGroups]);
-  return { groups, loading, refetch: fetchGroups };
+  const clearGroupUnread = useCallback((groupId: string) => {
+    setGroups((prev) => prev.map((g) => g.id === groupId ? { ...g, unread_count: 0 } : g));
+  }, []);
+
+  return { groups, loading, refetch: fetchGroups, clearGroupUnread };
 }
 
 export function useGroupChatMessages(groupId: string, userId: string | undefined) {
   const [groupConv, setGroupConv] = useState<GroupConversation | null>(null);
   const [members, setMembers] = useState<UserProfile[]>([]);
+  const [memberReadMap, setMemberReadMap] = useState<Record<string, string | null>>({});
   const [messages, setMessages] = useState<GroupMessage[]>([]);
   const [senderMap, setSenderMap] = useState<Record<string, UserProfile>>({});
   const [loading, setLoading] = useState(true);
@@ -123,18 +128,23 @@ export function useGroupChatMessages(groupId: string, userId: string | undefined
 
   const markAsRead = useCallback(async () => {
     if (!userId || !groupId) return;
+    const now = new Date().toISOString();
     await (supabase.from('group_members' as any) as any)
-      .update({ last_read_at: new Date().toISOString() })
+      .update({ last_read_at: now })
       .eq('group_id', groupId)
       .eq('user_id', userId);
+    if (userId) {
+      setMemberReadMap((prev) => ({ ...prev, [userId]: now }));
+    }
   }, [groupId, userId]);
+
 
   const fetchData = useCallback(async () => {
     if (!groupId || !userId) return;
 
     const [{ data: gc }, { data: memberRows }, { data: msgs }] = await Promise.all([
       supabase.from('group_conversations' as any).select('*').eq('id', groupId).maybeSingle(),
-      supabase.from('group_members' as any).select('user_id').eq('group_id', groupId),
+      supabase.from('group_members' as any).select('user_id, last_read_at').eq('group_id', groupId),
       (supabase.from('group_messages' as any) as any)
         .select('*')
         .eq('group_id', groupId)
@@ -144,7 +154,7 @@ export function useGroupChatMessages(groupId: string, userId: string | undefined
 
     setGroupConv(gc as unknown as GroupConversation);
     setHasMore((msgs?.length ?? 0) === PAGE_SIZE);
-
+    setMessages((msgs ?? []) as GroupMessage[]);
     const memberIds = ((memberRows ?? []) as any[]).map((m: any) => m.user_id);
     if (memberIds.length > 0) {
       const { data: users } = await supabase.from('users').select('*').in('id', memberIds);
@@ -152,10 +162,13 @@ export function useGroupChatMessages(groupId: string, userId: string | undefined
       setMembers(memberList);
       const map: Record<string, UserProfile> = {};
       memberList.forEach((u) => { map[u.id] = u; });
+      const readMap2: Record<string, string | null> = {};
+      ((memberRows ?? []) as any[]).forEach((r: any) => { readMap2[r.user_id] = r.last_read_at; });
+      console.log("memberReadMap updated:", JSON.stringify(readMap2));
+      setMemberReadMap(readMap2);
       setSenderMap(map);
     }
 
-    setMessages((msgs ?? []) as GroupMessage[]);
     setLoading(false);
     await markAsRead();
   }, [groupId, userId, markAsRead]);
@@ -187,6 +200,7 @@ export function useGroupChatMessages(groupId: string, userId: string | undefined
         { event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_id=eq.${groupId}` },
         async (payload) => {
           const newMsg = payload.new as GroupMessage;
+          if (newMsg.sender_id === userId) return;
           setMessages((prev) => prev.find((m) => m.id === newMsg.id) ? prev : [newMsg, ...prev]);
           if (newMsg.sender_id !== userId) {
             if (!senderMap[newMsg.sender_id]) {
@@ -197,7 +211,6 @@ export function useGroupChatMessages(groupId: string, userId: string | undefined
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             }
           }
-          await markAsRead();
         }
       )
       .on(
@@ -210,14 +223,30 @@ export function useGroupChatMessages(groupId: string, userId: string | undefined
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    const memberChannel = supabase
+      .channel(`group_members_${groupId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'group_members', filter: `group_id=eq.${groupId}` },
+        (payload) => {
+          const updated = payload.new as any;
+          setMemberReadMap((prev) => ({
+            ...prev,
+            [updated.user_id]: updated.last_read_at,
+          }));
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+      supabase.removeChannel(memberChannel);
+    };
   }, [fetchData, groupId, userId]);
 
   const sendMessage = useCallback(async (content: string, type: GroupMessage['message_type'] = 'text') => {
     if (!content.trim() || !userId || !groupId || sending) return;
     setSending(true);
 
-    console.log('グループ送信 groupId:', groupId, 'sender_id:', userId, 'type:', type);
 
     const tempId = `temp_${Date.now()}_${Math.random()}`;
     const temp: GroupMessage = {
@@ -240,11 +269,10 @@ export function useGroupChatMessages(groupId: string, userId: string | undefined
 
     if (!error && msg) {
       console.log('グループ送信成功:', (msg as GroupMessage).id);
-      setMessages((prev) =>
-        prev.some((m) => m.id === (msg as GroupMessage).id)
-          ? prev.filter((m) => m.id !== tempId)
-          : prev.map((m) => m.id === tempId ? msg as GroupMessage : m)
-      );
+      setMessages((prev) => {
+        const filtered = prev.filter((m) => m.id !== tempId && m.id !== (msg as GroupMessage).id);
+        return [(msg as GroupMessage), ...filtered];
+      });
       await (supabase.from('group_conversations' as any) as any)
         .update({ last_message_at: (msg as GroupMessage).created_at })
         .eq('id', groupId);
@@ -262,8 +290,8 @@ export function useGroupChatMessages(groupId: string, userId: string | undefined
   }, []);
 
   return {
-    groupConv, members, messages, senderMap,
+    groupConv, members, messages, senderMap, memberReadMap,
     loading, sending, isLoadingMore, hasMore,
-    sendMessage, deleteMessage, loadMore, markAsRead,
+    sendMessage, deleteMessage, loadMore, markAsRead, setMessages,
   };
 }

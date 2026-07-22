@@ -118,7 +118,7 @@ export default function ChatsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [previewEnabled, setPreviewEnabled] = useState(true);
 
-  const { groups, loading: groupsLoading, refetch: refetchGroups } = useGroupConversations(userId);
+  const { groups, loading: groupsLoading, refetch: refetchGroups, clearGroupUnread } = useGroupConversations(userId);
 
   useEffect(() => {
     AsyncStorage.getItem(MESSAGE_PREVIEW_KEY).then((val) => {
@@ -196,10 +196,6 @@ export default function ChatsScreen() {
     useCallback(() => {
       fetchDMs();
       refetchGroups();
-      const timer = setTimeout(() => {
-        fetchDMs();
-      }, 1000);
-      return () => clearTimeout(timer);
     }, [fetchDMs, refetchGroups])
   );
 
@@ -220,8 +216,6 @@ export default function ChatsScreen() {
     return new Date(bTime).getTime() - new Date(aTime).getTime();
   });
 
-  console.log("dm times:", dmItems.map(d=>d.last_message_at));
-  console.log("group times:", groups.map(g=>g.last_message_at));
   const uniqueChatItems = chatItems.filter((item, index, self) => self.findIndex(i => i.type === item.type && i.data.id === item.data.id) === index);
   const loading = dmLoading || groupsLoading;
 
@@ -289,7 +283,7 @@ export default function ChatsScreen() {
             return (
               <TouchableOpacity
                 style={gcStyles.row}
-                onPress={() => router.push(`/group-chat/${gc.id}`)}
+                onPress={() => { clearGroupUnread(gc.id); router.push(`/group-chat/${gc.id}`); }}
                 activeOpacity={0.7}
               >
                 <View style={gcStyles.avatarWrapper}>

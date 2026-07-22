@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/authStore';
 function useUnreadCount() {
   const { session } = useAuthStore();
   const [count, setCount] = useState(0);
+  useEffect(() => { (global as any).__setUnreadCount = setCount; return () => { delete (global as any).__setUnreadCount; }; }, []);
 
   const refresh = async () => {
     if (!session?.user) { setCount(0); return; }
@@ -59,25 +60,46 @@ function useUnreadCount() {
 
     const channel = supabase
       .channel('unread_count_watch')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, refresh)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages' }, refresh)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+  const msg = payload.new as any;
+  if (msg.sender_id !== session?.user?.id) {
+    setCount((c) => c + 1);
+  }
+})
+.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'group_members' }, (payload) => {
+  const updated = payload.new as any;
+  if (updated.user_id === session?.user?.id && updated.last_read_at) {
+    refresh();
+  }
+}).on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
+  const msg = payload.new as any;
+  const oldMsg = payload.old as any;
+  if (!oldMsg.read_at && msg.read_at && msg.sender_id !== session?.user?.id) {
+    setCount((c) => Math.max(0, c - 1));
+  }
+})
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages' }, (payload) => { const msg = payload.new as any; if (msg.sender_id !== session?.user?.id) { setCount((c) => c + 1); } })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, [session]);
-
-  return count;
+  return { count, refresh };
 }
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const tabBarHeight = 56 + insets.bottom;
-  const unreadCount = useUnreadCount();
+  const { count: unreadCount, refresh: refreshUnread } = useUnreadCount();
   const C = useColors();
 
   return (
     <Tabs
       initialRouteName="friends"
+      screenListeners={{
+        focus: () => {
+          refreshUnread();
+        },
+      }}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: C.primary,
