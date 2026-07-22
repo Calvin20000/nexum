@@ -60,25 +60,23 @@ function useUnreadCount() {
 
     const channel = supabase
       .channel('unread_count_watch')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
   const msg = payload.new as any;
-  if (msg.sender_id !== session?.user?.id) {
-    setCount((c) => c + 1);
-  }
+  if (msg.sender_id !== session?.user?.id) setCount((c) => c + 1);
+})
+.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
+  const msg = payload.new as any;
+  const old = payload.old as any;
+  if (!old.read_at && msg.read_at) setCount((c) => Math.max(0, c - 1));
+})
+.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages' }, (payload) => {
+  const msg = payload.new as any;
+  if (msg.sender_id !== session?.user?.id) setCount((c) => c + 1);
 })
 .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'group_members' }, (payload) => {
   const updated = payload.new as any;
-  if (updated.user_id === session?.user?.id && updated.last_read_at) {
-    refresh();
-  }
-}).on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
-  const msg = payload.new as any;
-  const oldMsg = payload.old as any;
-  if (!oldMsg.read_at && msg.read_at && msg.sender_id !== session?.user?.id) {
-    setCount((c) => Math.max(0, c - 1));
-  }
+  if (updated.user_id === session?.user?.id) refresh();
 })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages' }, (payload) => { const msg = payload.new as any; if (msg.sender_id !== session?.user?.id) { setCount((c) => c + 1); } })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -90,6 +88,10 @@ export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const tabBarHeight = 56 + insets.bottom;
   const { count: unreadCount, refresh: refreshUnread } = useUnreadCount();
+  useEffect(() => {
+    (global as any).__refreshUnread = refreshUnread;
+    return () => { delete (global as any).__refreshUnread; };
+  }, [refreshUnread]);
   const C = useColors();
 
   return (

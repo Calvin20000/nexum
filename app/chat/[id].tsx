@@ -17,7 +17,7 @@ import {
   Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { ChevronLeft, Send, Image as ImageIcon, Smile, Sticker, Camera, X } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Linking from 'expo-linking';
@@ -36,7 +36,7 @@ import { useColors } from '@/lib/theme';
 import { SOUND_ENABLED_KEY, VIBRATE_ENABLED_KEY } from '@/app/(tabs)/settings';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 20;
 
 type PanelType = 'none' | 'emoji' | 'sticker';
 
@@ -121,7 +121,13 @@ export default function ChatScreen() {
   }, []);
 
   const userId = session?.user?.id;
-
+useFocusEffect(
+    useCallback(() => {
+      if ((global as any).__refreshUnread) {
+        setTimeout(() => (global as any).__refreshUnread(), 500);
+      }
+    }, [])
+  );
 
 
   // With inverted FlatList, offset 0 is always the newest message (visual bottom).
@@ -294,16 +300,14 @@ export default function ChatScreen() {
     setLoading(false);
 
     const unread = (msgs ?? []).filter((m) => m.sender_id !== userId && !m.read_at);
+
+    console.log('unread count:', unread.length);
     if (unread.length > 0) {
-      // タブバッジを即時減算
-      const event = new Event("chatRead");
-      (global as any).__chatReadCount = ((global as any).__chatReadCount || 0) + unread.length;
-    }
-    if (unread.length > 0) {
-      await supabase
+      const { error } = await supabase
         .from('messages')
         .update({ read_at: new Date().toISOString() })
         .in('id', unread.map((m) => m.id));
+      console.log('read update error:', JSON.stringify(error));
     }
   }, [id, userId]);
 

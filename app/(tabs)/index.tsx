@@ -148,7 +148,7 @@ export default function ChatsScreen() {
       .from('conversations')
       .select('*')
       .or(`participant_1_id.eq.${userId},participant_2_id.eq.${userId}`)
-      .order('last_message_at', { ascending: false });
+      .order('last_message_at', { ascending: false }).limit(10);
 
     const items: ConversationWithUnread[] = await Promise.all(
       (dmData ?? []).map(async (conv) => {

@@ -14,7 +14,7 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { ChevronLeft, Send, Users, Smile, Sticker, ImageIcon } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { GroupMessage } from '@/types/database';
@@ -49,6 +49,13 @@ export default function GroupChatScreen() {
 
   const [text, setText] = useState('');
   useEffect(() => { markAsRead(); }, [messages]);
+  useFocusEffect(
+    useCallback(() => {
+      if ((global as any).__refreshUnread) {
+        setTimeout(() => (global as any).__refreshUnread(), 500);
+      }
+    }, [])
+  );
   const [panel, setPanel] = useState<PanelType>('none');
   const [showMembers, setShowMembers] = useState(false);
 

@@ -124,7 +124,7 @@ export function useGroupChatMessages(groupId: string, userId: string | undefined
   const [sending, setSending] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const PAGE_SIZE = 50;
+  const PAGE_SIZE = 20;
 
   const markAsRead = useCallback(async () => {
     if (!userId || !groupId) return;
