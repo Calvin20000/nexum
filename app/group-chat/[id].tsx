@@ -49,18 +49,13 @@ export default function GroupChatScreen() {
 
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState<GroupMessage | null>(null);
+  const [pendingImage, setPendingImage] = useState<{ uri: string; mimeType: string } | null>(null);
+  const [replyCache, setReplyCache] = useState<Record<string, GroupMessage>>({});
   useEffect(() => { markAsRead(); }, [messages]);
   useFocusEffect(
     useCallback(() => {
-      if ((global as any).__setUnreadCount) {
-        (global as any).__setUnreadCount((c) => Math.max(0, c - 99));
-      }
-      return () => {
-        if ((global as any).__refreshUnread) {
-          setTimeout(() => (global as any).__refreshUnread(), 300);
-        }
-      };
-    }, [])
+      markAsRead();
+    }, [markAsRead])
   );
   const [panel, setPanel] = useState<PanelType>('none');
   const [showMembers, setShowMembers] = useState(false);
@@ -114,12 +109,11 @@ export default function GroupChatScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
       quality: 0.8,
     });
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
-    await uploadAndSendImage(asset.uri, asset.mimeType ?? 'image/jpeg');
+    setPendingImage({ uri: asset.uri, mimeType: asset.mimeType ?? 'image/jpeg' });
   };
 
   const uploadAndSendImage = async (uri: string, mimeType: string) => {
@@ -157,6 +151,20 @@ export default function GroupChatScreen() {
   const renderMessage = useCallback(({ item, index }: { item: GroupMessage; index: number }) => {
     const isOwn = item.sender_id === userId;
     const sender = senderMap[item.sender_id];
+    let replyMsg: GroupMessage | null = null;
+    if (item.reply_to_id) {
+      replyMsg = messages.find((m) => m.id === item.reply_to_id) ?? replyCache[item.reply_to_id] ?? null;
+      if (!replyMsg && !replyCache[item.reply_to_id]) {
+        (supabase.from('group_messages' as any) as any)
+          .select('*')
+          .eq('id', item.reply_to_id)
+          .maybeSingle()
+          .then(({ data }: any) => {
+            if (data) setReplyCache((prev) => ({ ...prev, [data.id]: data as GroupMessage }));
+          });
+      }
+    }
+    const replySender = replyMsg ? senderMap[replyMsg.sender_id] : undefined;
     const prevMsg = index < messages.length - 1 ? messages[index + 1] : null;
     const showAvatar = !isOwn && (!prevMsg || prevMsg.sender_id !== item.sender_id);
     const showName = !isOwn && showAvatar;
@@ -186,7 +194,22 @@ export default function GroupChatScreen() {
                 {sender?.display_name || sender?.handle}
               </Text>
             )}
-            <Text style={styles.sticker}>{item.content}</Text>
+            {replyMsg && (
+              <View style={{ backgroundColor: '#BBDEFB', borderRadius: 8, padding: 6, marginBottom: 4, borderLeftWidth: 3, borderLeftColor: '#1976D2' }}>
+                <Text style={{ fontSize: 11, color: '#1976D2', fontWeight: '700' }}>
+                  {replySender?.display_name || replySender?.handle || ''}
+                </Text>
+                {replyMsg.message_type === 'stamp' || replyMsg.message_type === 'sticker' ? (
+                  <Text style={{ fontSize: 24 }}>{replyMsg.content}</Text>
+                ) : replyMsg.message_type === 'image' && replyMsg.image_url ? (
+                  <Image source={{ uri: replyMsg.image_url }} style={{ width: 40, height: 40, borderRadius: 4 }} />
+                ) : (
+                  <Text style={{ fontSize: 12, color: '#424242' }} numberOfLines={1}>{replyMsg.content}</Text>
+                )}
+              </View>
+            )}<TouchableOpacity onLongPress={() => setReplyTo(item)} activeOpacity={0.8}>
+  <Text style={styles.sticker}>{item.content}</Text>
+</TouchableOpacity>
             <Text style={[styles.timeLabel, isOwn ? styles.timeLabelOwn : styles.timeLabelOther]}>
               {formatTime(item.created_at)}
             </Text>
@@ -214,7 +237,7 @@ export default function GroupChatScreen() {
                 {sender?.display_name || sender?.handle}
               </Text>
             )}
-            <TouchableOpacity onLongPress={() => handleDeleteMessage(item)} activeOpacity={0.9}>
+            <TouchableOpacity onLongPress={() => setReplyTo(item)} activeOpacity={0.9}>
               <Image source={{ uri: item.image_url }} style={styles.imageBubble} resizeMode="cover" />
             </TouchableOpacity>
             {isOwn && Object.entries(memberReadMap).some(([uid, readAt]) => 
@@ -244,7 +267,20 @@ export default function GroupChatScreen() {
               {sender?.display_name || sender?.handle}
             </Text>
           )}
-          <TouchableOpacity onLongPress={() => { setReplyTo(item); }} activeOpacity={0.85}>
+          {replyMsg && (
+              <View style={{ backgroundColor: '#BBDEFB', borderRadius: 8, padding: 6, marginBottom: 4, borderLeftWidth: 3, borderLeftColor: '#1976D2' }}>
+                <Text style={{ fontSize: 11, color: '#1976D2', fontWeight: '700' }}>
+                  {replySender?.display_name || replySender?.handle || ''}
+                </Text>
+                {replyMsg.message_type === 'image' && replyMsg.image_url ? (
+                  <Image source={{ uri: replyMsg.image_url }} style={{ width: 40, height: 40, borderRadius: 4 }} />
+                ) : replyMsg.message_type === 'stamp' || replyMsg.message_type === 'sticker' ? (
+                  <Text style={{ fontSize: 24 }}>{replyMsg.content}</Text>
+                ) : (
+                  <Text style={{ fontSize: 12, color: '#424242' }} numberOfLines={1}>{replyMsg.content}</Text>
+                )}
+              </View>
+            )}<TouchableOpacity onLongPress={() => { setReplyTo(item); }} activeOpacity={0.85}>
             <View style={[
               styles.bubble,
               isOwn ? [styles.bubbleOwn, { backgroundColor: C.primary }] : styles.bubbleOther,
@@ -264,7 +300,7 @@ export default function GroupChatScreen() {
         </View>
       </View>
     );
-  }, [userId, senderMap, messages, C.primary, memberReadMap, setReplyTo]);
+  }, [userId, senderMap, messages, C.primary, memberReadMap, setReplyTo, replyCache]);
 
   if (loading) {
     return (
@@ -416,6 +452,17 @@ export default function GroupChatScreen() {
         {panel === 'emoji' && <EmojiPicker onSelect={(emoji) => setText((p) => p + emoji)} />}
         {panel === 'sticker' && <StickerPicker onSelect={handleStickerSelect} />}
       </KeyboardAvoidingView>
+      {pendingImage && (
+        <View style={{position:"absolute",top:0,left:0,right:0,bottom:0,backgroundColor:"rgba(0,0,0,0.8)",justifyContent:"center",alignItems:"center"}}>
+          <Image source={{uri:pendingImage.uri}} style={{width:300,height:300,borderRadius:12}} resizeMode="contain"/>
+          <TouchableOpacity onPress={()=>setPendingImage(null)}>
+            <Text style={{color:"white",marginTop:24}}>cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={async()=>{const img=pendingImage;setPendingImage(null);await uploadAndSendImage(img.uri,img.mimeType);}}>
+            <Text style={{color:"white",marginTop:8}}>send</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 }

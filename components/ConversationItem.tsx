@@ -9,6 +9,7 @@ const UNREAD_BLUE = '#1976D2';
 interface ConversationItemProps {
   item: ConversationWithUser & { unread_count?: number };
   onPress: () => void;
+  onLongPress?: () => void;
   previewEnabled?: boolean;
 }
 
@@ -22,7 +23,7 @@ function formatTime(iso: string): string {
   return date.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
 }
 
-export function ConversationItem({ item, onPress, previewEnabled = true }: ConversationItemProps) {
+export function ConversationItem({ item, onPress, onLongPress, previewEnabled = true }: ConversationItemProps) {
   const lastMsg = item.last_message;
   const user = item.other_user;
   const unreadCount = item.unread_count ?? 0;
@@ -46,7 +47,7 @@ export function ConversationItem({ item, onPress, previewEnabled = true }: Conve
   const isStamp = lastMsg?.message_type === 'sticker' || lastMsg?.message_type === 'stamp';
 
   return (
-    <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity style={styles.container} onPress={onPress} onLongPress={onLongPress} activeOpacity={0.7}>
       <Avatar
         uri={user.avatar_url}
         name={user.display_name || user.handle}

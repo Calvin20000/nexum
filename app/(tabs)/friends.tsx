@@ -99,6 +99,8 @@ export default function FriendsScreen() {
 
   const [groups, setGroups] = useState<FriendGroup[]>([]);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [showGroupSection, setShowGroupSection] = useState(true);
+  const [showFriendSection, setShowFriendSection] = useState(true);
   const [groupInvitations, setGroupInvitations] = useState<any[]>([]);
 
   const fetchGroupInvitations = async () => {
@@ -441,21 +443,24 @@ export default function FriendsScreen() {
           }
         >
           {/* グループセクション */}
-          <View style={styles.sectionHeader}>
+          <TouchableOpacity style={styles.sectionHeader} onPress={() => setShowGroupSection((v) => !v)} activeOpacity={0.7}>
             <View style={styles.sectionLeft}>
               <Users size={14} color={C.primary} />
-              <Text style={styles.sectionLabel}>グループ</Text>
+              <Text style={styles.sectionLabel}>グループ ({groups.length})</Text>
             </View>
-            <TouchableOpacity
-              style={[styles.createGroupBtn, { backgroundColor: C.primary }]}
-              onPress={() => setShowCreateGroup(true)}
-            >
-              <Plus size={13} color={Colors.white} />
-              <Text style={styles.createGroupText}>作成</Text>
-            </TouchableOpacity>
-          </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <TouchableOpacity
+                style={[styles.createGroupBtn, { backgroundColor: C.primary }]}
+                onPress={() => setShowCreateGroup(true)}
+              >
+                <Plus size={13} color={Colors.white} />
+                <Text style={styles.createGroupText}>作成</Text>
+              </TouchableOpacity>
+              <Text style={{ color: C.primary, fontSize: 18 }}>{showGroupSection ? '▲' : '▼'}</Text>
+            </View>
+          </TouchableOpacity>
 
-          {groups.length === 0 ? (
+          {showGroupSection && (groups.length === 0 ? (
             <View style={styles.groupEmpty}>
               <Text style={styles.groupEmptyText}>グループがありません</Text>
             </View>
@@ -470,16 +475,16 @@ export default function FriendsScreen() {
 
               </TouchableOpacity>
             ))
-          )}
-
+          ))}
           {/* フレンドセクション */}
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionLeft}>
-              <Text style={styles.sectionLabel}>フレンド ({friends.length})</Text>
-            </View>
-          </View>
+          <TouchableOpacity style={styles.sectionHeader} onPress={() => setShowFriendSection((v) => !v)} activeOpacity={0.7}>
+  <View style={styles.sectionLeft}>
+    <Text style={styles.sectionLabel}>フレンド ({friends.length})</Text>
+  </View>
+  <Text style={{ color: C.primary, fontSize: 18 }}>{showFriendSection ? '▲' : '▼'}</Text>
+</TouchableOpacity>
 
-          {friends.length === 0 ? (
+          {showFriendSection && (friends.length === 0 ? (
             <View style={styles.empty}>
               <Text style={styles.emptyTitle}>フレンドがいません</Text>
               <Text style={styles.emptySubtitle}>@IDで友達を検索して申請しましょう</Text>
@@ -522,7 +527,7 @@ export default function FriendsScreen() {
                 {index < friends.length - 1 && <View style={styles.separator} />}
               </View>
             ))
-          )}
+          ))}
         </ScrollView>
       )}
 

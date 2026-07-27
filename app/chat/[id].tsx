@@ -307,7 +307,9 @@ useFocusEffect(
         .from('messages')
         .update({ read_at: new Date().toISOString() })
         .in('id', unread.map((m) => m.id));
-      console.log('read update error:', JSON.stringify(error));
+      if (!error && (global as any).__refreshUnread) {
+        setTimeout(() => (global as any).__refreshUnread(), 300);
+      }
     }
   }, [id, userId]);
 

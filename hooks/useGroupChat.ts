@@ -128,6 +128,9 @@ export function useGroupChatMessages(groupId: string, userId: string | undefined
 
   const markAsRead = useCallback(async () => {
     if (!userId || !groupId) return;
+    if ((global as any).__setUnreadCount) {
+      (global as any).__setUnreadCount((c: number) => Math.max(0, c - 99));
+    }
     const now = new Date().toISOString();
     await (supabase.from('group_members' as any) as any)
       .update({ last_read_at: now })
@@ -135,6 +138,9 @@ export function useGroupChatMessages(groupId: string, userId: string | undefined
       .eq('user_id', userId);
     if (userId) {
       setMemberReadMap((prev) => ({ ...prev, [userId]: now }));
+    }
+    if ((global as any).__refreshUnread) {
+      setTimeout(() => (global as any).__refreshUnread(), 300);
     }
   }, [groupId, userId]);
 

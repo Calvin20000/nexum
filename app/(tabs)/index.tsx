@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Edit3 } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
 import { ConversationWithUser, UserProfile } from '@/types/database';
@@ -117,6 +118,7 @@ export default function ChatsScreen() {
   const [dmLoading, setDmLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [previewEnabled, setPreviewEnabled] = useState(true);
+  const [hiddenItems, setHiddenItems] = useState<string[]>([]);
 
   const { groups, loading: groupsLoading, refetch: refetchGroups, clearGroupUnread } = useGroupConversations(userId);
 
@@ -125,6 +127,28 @@ export default function ChatsScreen() {
       if (val !== null) setPreviewEnabled(val !== 'false');
     });
   }, []);
+  useEffect(() => {
+    AsyncStorage.getItem('hidden_chats').then((val) => {
+      if (val) setHiddenItems(JSON.parse(val));
+    });
+  }, []);
+
+  const hideChat = (id: string, type: string) => {
+    const key = type + '_' + id;
+    Alert.alert('非表示', 'このチャットを非表示にしますか？', [
+      { text: 'キャンセル', style: 'cancel' },
+      { text: '非表示', style: 'destructive', onPress: () => {
+        const newHidden = [...hiddenItems, key];
+        setHiddenItems(newHidden);
+        AsyncStorage.setItem('hidden_chats', JSON.stringify(newHidden));
+      }},
+    ]);
+  };
+
+  const showAllChats = () => {
+    setHiddenItems([]);
+    AsyncStorage.removeItem('hidden_chats');
+  };
   useEffect(() => {
     if (!userId) return;
     const channel = supabase
@@ -209,14 +233,20 @@ export default function ChatsScreen() {
     ...dmItems.map((d) => ({ type: 'dm' as const, data: d })),
     ...groups.map((g) => ({ type: 'group' as const, data: g })),
   ].sort((a, b) => {
+    const aUnread = (a.data as any).unread_count ?? 0;
+    const bUnread = (b.data as any).unread_count ?? 0;
+    if (aUnread > 0 && bUnread === 0) return -1;
+    if (bUnread > 0 && aUnread === 0) return 1;
     const aTime = a.data.last_message_at ?? '1970-01-01';
-     if (!a.data.last_message_at) return 1;
-    if (!b.data.last_message_at) return -1;
     const bTime = b.data.last_message_at ?? '1970-01-01';
+    if (!a.data.last_message_at) return 1;
+    if (!b.data.last_message_at) return -1;
     return new Date(bTime).getTime() - new Date(aTime).getTime();
   });
 
-  const uniqueChatItems = chatItems.filter((item, index, self) => self.findIndex(i => i.type === item.type && i.data.id === item.data.id) === index);
+  const uniqueChatItems = chatItems
+    .filter((item, index, self) => self.findIndex(i => i.type === item.type && i.data.id === item.data.id) === index)
+    .filter((item) => !hiddenItems.includes(item.type + '_' + item.data.id));
   const loading = dmLoading || groupsLoading;
 
   if (loading) {
@@ -234,9 +264,7 @@ export default function ChatsScreen() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <Text style={[styles.headerTitle, { color: C.primary }]}>NEXUM</Text>
-        <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/chat/new')}>
-          <Edit3 size={22} color={C.primary} />
-        </TouchableOpacity>
+
       </View>
 
       {chatItems.length === 0 ? (
@@ -257,11 +285,13 @@ export default function ChatsScreen() {
           renderItem={({ item }) => {
             if (item.type === 'dm') {
               return (
-                <ConversationItem
-                  item={item.data}
-                  onPress={() => router.push(`/chat/${item.data.id}`)}
-                  previewEnabled={previewEnabled}
-                />
+                
+                  <ConversationItem
+  item={item.data}
+  onPress={() => router.push(`/chat/${item.data.id}`)}
+  onLongPress={() => hideChat(item.data.id, 'dm')}
+  previewEnabled={previewEnabled}
+/>
               );
             }
 
@@ -284,6 +314,7 @@ export default function ChatsScreen() {
               <TouchableOpacity
                 style={gcStyles.row}
                 onPress={() => { clearGroupUnread(gc.id); router.push(`/group-chat/${gc.id}`); }}
+                onLongPress={() => hideChat(gc.id, 'group')}
                 activeOpacity={0.7}
               >
                 <View style={gcStyles.avatarWrapper}>
