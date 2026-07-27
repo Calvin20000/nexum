@@ -243,7 +243,7 @@ export function useGroupChatMessages(groupId: string, userId: string | undefined
     };
   }, [fetchData, groupId, userId]);
 
-  const sendMessage = useCallback(async (content: string, type: GroupMessage['message_type'] = 'text') => {
+  const sendMessage = useCallback(async (content: string, type: GroupMessage['message_type'] = 'text', replyToId?: string) => {
     if (!content.trim() || !userId || !groupId || sending) return;
     setSending(true);
 
@@ -263,7 +263,7 @@ export function useGroupChatMessages(groupId: string, userId: string | undefined
     setMessages((prev) => [temp, ...prev]);
 
     const { data: msg, error } = await (supabase.from('group_messages' as any) as any)
-      .insert({ group_id: groupId, sender_id: userId, message_type: type, content: content.trim() })
+      .insert({ group_id: groupId, sender_id: userId, message_type: type, content: content.trim(), reply_to_id: replyToId ?? null })
       .select()
       .single();
 

@@ -64,33 +64,35 @@ function useUnreadCount() {
   const msg = payload.new as any;
   if (msg.sender_id !== session?.user?.id) setCount((c) => c + 1);
 })
-.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
-  const msg = payload.new as any;
-  const old = payload.old as any;
-  if (!old.read_at && msg.read_at) setCount((c) => Math.max(0, c - 1));
-})
+.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, () => { refresh(); })
 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages' }, (payload) => {
   const msg = payload.new as any;
   if (msg.sender_id !== session?.user?.id) setCount((c) => c + 1);
 })
 .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'group_members' }, (payload) => {
   const updated = payload.new as any;
-  if (updated.user_id === session?.user?.id) refresh();
+  if (updated.user_id === session?.user?.id && updated.last_read_at) {
+    refresh();
+  }
 })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, [session]);
-  return { count, refresh };
+  return { count, refresh, setCount };
 }
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const tabBarHeight = 56 + insets.bottom;
-  const { count: unreadCount, refresh: refreshUnread } = useUnreadCount();
+  const { count: unreadCount, refresh: refreshUnread, setCount: setUnreadCount } = useUnreadCount();
   useEffect(() => {
     (global as any).__refreshUnread = refreshUnread;
-    return () => { delete (global as any).__refreshUnread; };
+    (global as any).__setUnreadCount = setUnreadCount;
+    return () => {
+      delete (global as any).__refreshUnread;
+      delete (global as any).__setUnreadCount;
+    };
   }, [refreshUnread]);
   const C = useColors();
 

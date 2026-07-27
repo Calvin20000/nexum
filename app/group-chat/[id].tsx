@@ -48,12 +48,18 @@ export default function GroupChatScreen() {
   } = useGroupChatMessages(id as string, userId);
 
   const [text, setText] = useState('');
+  const [replyTo, setReplyTo] = useState<GroupMessage | null>(null);
   useEffect(() => { markAsRead(); }, [messages]);
   useFocusEffect(
     useCallback(() => {
-      if ((global as any).__refreshUnread) {
-        setTimeout(() => (global as any).__refreshUnread(), 500);
+      if ((global as any).__setUnreadCount) {
+        (global as any).__setUnreadCount((c) => Math.max(0, c - 99));
       }
+      return () => {
+        if ((global as any).__refreshUnread) {
+          setTimeout(() => (global as any).__refreshUnread(), 300);
+        }
+      };
     }, [])
   );
   const [panel, setPanel] = useState<PanelType>('none');
@@ -75,7 +81,9 @@ export default function GroupChatScreen() {
   const handleSend = async () => {
     const content = text;
     setText('');
-    await sendMessage(content);
+    const replyId = replyTo?.id;
+    setReplyTo(null);
+    await sendMessage(content, 'text', replyId);
     scrollToBottom();
   };
 
@@ -179,6 +187,9 @@ export default function GroupChatScreen() {
               </Text>
             )}
             <Text style={styles.sticker}>{item.content}</Text>
+            <Text style={[styles.timeLabel, isOwn ? styles.timeLabelOwn : styles.timeLabelOther]}>
+              {formatTime(item.created_at)}
+            </Text>
             {isOwn && Object.entries(memberReadMap ?? {}).some(([uid, readAt]) =>
               uid !== userId && readAt &&
               new Date(readAt) >= new Date(item.created_at)
@@ -233,7 +244,7 @@ export default function GroupChatScreen() {
               {sender?.display_name || sender?.handle}
             </Text>
           )}
-          <TouchableOpacity onLongPress={() => handleDeleteMessage(item)} activeOpacity={0.85}>
+          <TouchableOpacity onLongPress={() => { setReplyTo(item); }} activeOpacity={0.85}>
             <View style={[
               styles.bubble,
               isOwn ? [styles.bubbleOwn, { backgroundColor: C.primary }] : styles.bubbleOther,
@@ -253,7 +264,7 @@ export default function GroupChatScreen() {
         </View>
       </View>
     );
-  }, [userId, senderMap, messages, C.primary, memberReadMap]);
+  }, [userId, senderMap, messages, C.primary, memberReadMap, setReplyTo]);
 
   if (loading) {
     return (
@@ -342,6 +353,21 @@ export default function GroupChatScreen() {
           }
         />
 
+        {replyTo && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#E3F2FD', paddingHorizontal: 12, paddingVertical: 6, borderTopWidth: 1, borderTopColor: '#BBDEFB' }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11, color: '#1976D2', fontWeight: '700' }}>
+                返信先: {replyTo.sender_id === userId ? 'あなた' : (senderMap[replyTo.sender_id]?.display_name ?? '')}
+              </Text>
+              <Text style={{ fontSize: 12, color: '#424242' }} numberOfLines={1}>
+                {replyTo.content}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => setReplyTo(null)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Text style={{ fontSize: 18, color: '#9E9E9E' }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         <View style={styles.inputBar}>
           <TouchableOpacity
             style={[styles.toolBtn, panel === 'sticker' && styles.toolBtnActive]}

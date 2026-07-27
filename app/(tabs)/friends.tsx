@@ -467,9 +467,7 @@ export default function FriendsScreen() {
                   <Text style={styles.groupName}>{group.name}</Text>
                   <Text style={styles.groupMemberCount}>{group.members?.length ?? 0}人のメンバー</Text>
                 </View>
-                <TouchableOpacity onPress={() => deleteGroup(group.id)} style={styles.deleteBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Trash2 size={16} color={Colors.error} />
-                </TouchableOpacity>
+
               </TouchableOpacity>
             ))
           )}
