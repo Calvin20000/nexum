@@ -18,8 +18,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
-import { ChevronLeft, Send, Image as ImageIcon, Smile, Sticker, Camera, X } from 'lucide-react-native';
+import { ChevronLeft, Send, Image as ImageIcon, Smile, Sticker, Camera, X, Paperclip, Plus } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import * as Location from 'expo-location';
 import * as Linking from 'expo-linking';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -692,6 +694,55 @@ useFocusEffect(
     }
   };
 
+  const handleSendLocation = async () => {
+    console.log('handleSendLocation called');
+    setShowPickerSheet(false);
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('error', 'location permission denied');
+      return;
+    }
+    const loc = await Location.getCurrentPositionAsync({});
+    const lat = loc.coords.latitude;
+    const lng = loc.coords.longitude;
+    const url = 'https://maps.google.com/?q=' + lat + ',' + lng;
+    const msg = 'location:' + lat + ',' + lng;
+    setText(msg);
+    setTimeout(() => {
+      handleSend();
+    }, 100);
+  };
+
+  const handlePickFile = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: '*/*',
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    const file = result.assets[0];
+    Alert.alert('送信', file.name, [
+      { text: 'キャンセル', style: 'cancel' },
+      { text: '送信', onPress: async () => {
+        try {
+          const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+          const path = userId + '/' + Date.now() + '_' + safeName;
+          const mime = file.mimeType ?? 'application/octet-stream';
+          const url = await uploadImageToStorage(file.uri, 'chats', path, mime);
+          const fileMsg = 'file:' + file.name + ':' + url;
+          setText(fileMsg);
+          setTimeout(() => handleSend(), 100);
+        } catch (e) {
+          const msg = String(e);
+          if (msg.includes('413') || msg.includes('maximum')) {
+            Alert.alert('エラー', 'ファイルサイズが大きすぎます。50MB以下のファイルを選択してください。');
+          } else {
+            Alert.alert('エラー', 'ファイルの送信に失敗しました');
+          }
+        }
+      }},
+    ]);
+  };
+
   const handlePickFromLibrary = async () => {
     setShowPickerSheet(false);
 
@@ -731,8 +782,16 @@ useFocusEffect(
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
+      allowsMultipleSelection: true,
+      selectionLimit: 10,
     });
-    if (result.canceled || !result.assets[0]) return;
+    if (result.canceled || !result.assets.length) return;
+    if (result.assets.length > 1) {
+      for (const a of result.assets) {
+        await uploadAndSendImage(a.uri, a.mimeType ?? 'image/jpeg', a.width ?? 0, a.height ?? 0);
+      }
+      return;
+    }
     const asset = result.assets[0];
 
     if (asset.fileSize && asset.fileSize > MAX_FILE_SIZE) {
@@ -1000,6 +1059,9 @@ useFocusEffect(
               </TouchableOpacity>
             )}
             <View style={styles.inputRow}>
+              <TouchableOpacity style={styles.toolBtn} onPress={() => setShowPickerSheet(true)}>
+                <Plus size={24} color={Colors.textMuted} />
+              </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.toolBtn, panel === 'sticker' && styles.toolBtnActive]}
                 onPress={() => openPanel('sticker')}
@@ -1007,15 +1069,12 @@ useFocusEffect(
                 <Sticker size={22} color={panel === 'sticker' ? C.primary : Colors.textMuted} />
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.toolBtn, panel === 'emoji' && styles.toolBtnActive]}
-                onPress={() => openPanel('emoji')}
-              >
-                <Smile size={22} color={panel === 'emoji' ? C.primary : Colors.textMuted} />
-              </TouchableOpacity>
 
-              <TouchableOpacity style={styles.toolBtn} onPress={handleImageButtonPress}>
+              <TouchableOpacity style={styles.toolBtn} onPress={handlePickFromCamera}>
                 <Camera size={22} color={Colors.textMuted} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.toolBtn} onPress={handlePickFromLibrary}>
+                <ImageIcon size={22} color={Colors.textMuted} />
               </TouchableOpacity>
 
               <TextInput
@@ -1091,14 +1150,14 @@ useFocusEffect(
           onPress={() => setShowPickerSheet(false)}
         >
           <View style={styles.sheetContainer}>
-            <Text style={styles.sheetTitle}>写真を送信</Text>
-            <TouchableOpacity style={styles.sheetOption} onPress={handlePickFromCamera}>
-              <Camera size={22} color={C.primary} />
-              <Text style={styles.sheetOptionText}>カメラで撮影</Text>
+                                    <Text style={styles.sheetTitle}>送信</Text>
+            <TouchableOpacity style={styles.sheetOption} onPress={() => { setShowPickerSheet(false); handlePickFile(); }}>
+              <Paperclip size={22} color={C.primary} />
+              <Text style={styles.sheetOptionText}>ファイルを送信</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.sheetOption} onPress={handlePickFromLibrary}>
-              <ImageIcon size={22} color={C.primary} />
-              <Text style={styles.sheetOptionText}>ライブラリから選択</Text>
+            <TouchableOpacity style={styles.sheetOption} onPress={handleSendLocation}>
+              <Text style={{ fontSize: 22 }}>📍</Text>
+              <Text style={styles.sheetOptionText}>位置情報を送信</Text>
             </TouchableOpacity>
             <View style={styles.sheetDivider} />
             <TouchableOpacity

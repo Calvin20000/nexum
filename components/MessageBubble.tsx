@@ -1,3 +1,4 @@
+import { Linking } from 'react-native';
 import React from 'react';
 import {
   View,
@@ -223,9 +224,28 @@ export function MessageBubble({
             {replyMessage && (
               <QuotedMessage message={replyMessage} senderName={replySenderName} />
             )}
-            <Text style={[styles.text, isOwn ? styles.textOwn : styles.textOther]}>
-              {message.content}
-            </Text>
+            {message.content?.startsWith('file:') ? (
+              <TouchableOpacity onPress={() => {
+                const parts = message.content?.split(':') ?? [];
+                const url = parts.slice(2).join(':');
+                Linking.openURL(url);
+              }}>
+                <Text style={{fontSize:20}}>file</Text>
+                <Text style={{color:'blue'}}>{message.content?.split(':')[1]}</Text>
+              </TouchableOpacity>
+            ) : message.content?.startsWith('location:') ? (
+              <TouchableOpacity onPress={() => {
+                const coords = message.content?.replace('location:', '');
+                Linking.openURL('https://maps.google.com/?q=' + coords);
+              }}>
+                <Text style={{fontSize:20}}>location</Text>
+                <Text style={{color:'blue'}}>Google Mapで開く</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={[styles.text, isOwn ? styles.textOwn : styles.textOther]}>
+                {message.content}
+              </Text>
+            )}
           </TouchableOpacity>
           {!isOwn && <Text style={styles.timeOther}>{time}</Text>}
         </View>

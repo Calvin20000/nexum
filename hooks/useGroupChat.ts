@@ -139,9 +139,11 @@ export function useGroupChatMessages(groupId: string, userId: string | undefined
     if (userId) {
       setMemberReadMap((prev) => ({ ...prev, [userId]: now }));
     }
-    if ((global as any).__refreshUnread) {
-      setTimeout(() => (global as any).__refreshUnread(), 300);
-    }
+    setTimeout(() => {
+      if (typeof (global as any).__refreshUnread === 'function') {
+        (global as any).__refreshUnread();
+      }
+    }, 300);
   }, [groupId, userId]);
 
 

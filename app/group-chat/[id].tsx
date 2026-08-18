@@ -15,7 +15,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
-import { ChevronLeft, Send, Users, Smile, Sticker, ImageIcon } from 'lucide-react-native';
+import { ChevronLeft, Send, Users, Smile, Sticker, ImageIcon, Plus, Paperclip } from 'lucide-react-native';
+import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { GroupMessage } from '@/types/database';
 import { useAuthStore } from '@/stores/authStore';
@@ -88,6 +89,21 @@ export default function GroupChatScreen() {
     scrollToBottom();
   };
 
+  const handlePickFile = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: '*/*',
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    const file = result.assets[0];
+    Alert.alert('ファイル送信', file.name + ' を送信しますか？', [
+      { text: 'キャンセル', style: 'cancel' },
+      { text: '送信', onPress: async () => {
+        await uploadAndSendImage(file.uri, file.mimeType ?? 'application/octet-stream');
+      }},
+    ]);
+  };
+
   const handlePickImage = async () => {
     if (Platform.OS === 'web') {
       const input = document.createElement('input');
@@ -110,10 +126,13 @@ export default function GroupChatScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
+      allowsMultipleSelection: true,
+      selectionLimit: 10,
     });
-    if (result.canceled || !result.assets[0]) return;
-    const asset = result.assets[0];
-    setPendingImage({ uri: asset.uri, mimeType: asset.mimeType ?? 'image/jpeg' });
+    if (result.canceled || !result.assets.length) return;
+    for (const asset of result.assets) {
+      await uploadAndSendImage(asset.uri, asset.mimeType ?? 'image/jpeg');
+    }
   };
 
   const uploadAndSendImage = async (uri: string, mimeType: string) => {
@@ -405,38 +424,32 @@ export default function GroupChatScreen() {
           </View>
         )}
         <View style={styles.inputBar}>
-          <TouchableOpacity
-            style={[styles.toolBtn, panel === 'sticker' && styles.toolBtnActive]}
-            onPress={() => openPanel('sticker')}
-          >
-            <Sticker size={22} color={panel === 'sticker' ? C.primary : Colors.textMuted} />
+          <TouchableOpacity style={styles.toolBtn} onPress={handlePickImage}>
+            <Plus size={24} color={Colors.textMuted} />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toolBtn, panel === 'emoji' && styles.toolBtnActive]}
-            onPress={() => openPanel('emoji')}
-          >
-            <Smile size={22} color={panel === 'emoji' ? C.primary : Colors.textMuted} />
+          <TouchableOpacity style={styles.toolBtn} onPress={handlePickFile}>
+            <Paperclip size={22} color={Colors.textMuted} />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.toolBtn}
-            onPress={handlePickImage}
-            disabled={sending}
-          >
-            <ImageIcon size={22} color={Colors.textMuted} />
+          <View style={styles.textInputWrapper}>
+            <TextInput
+              style={styles.textInput}
+              placeholder="メッセージを入力..."
+              placeholderTextColor={Colors.textMuted}
+              value={text}
+              onChangeText={setText}
+              multiline
+              maxLength={2000}
+              spellCheck={false}
+              autoCorrect={false}
+              onFocus={() => { closePanel(); scrollToBottom(); }}
+            />
+            <TouchableOpacity style={styles.emojiBtn} onPress={() => openPanel('none')}>
+              <Smile size={20} color={Colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity style={styles.toolBtn} onPress={() => openPanel('sticker')}>
+            <Sticker size={22} color={Colors.textMuted} />
           </TouchableOpacity>
-
-          <TextInput
-            style={styles.textInput}
-            placeholder="メッセージを入力..."
-            placeholderTextColor={Colors.textMuted}
-            value={text}
-            onChangeText={setText}
-            multiline
-            maxLength={2000}
-            spellCheck={false}
-            autoCorrect={false}
-            onFocus={() => { closePanel(); scrollToBottom(); }}
-          />
 
           <TouchableOpacity
             style={[styles.sendBtn, { backgroundColor: C.primary }, (!text.trim() || sending) && styles.sendBtnDisabled]}
@@ -538,6 +551,20 @@ const styles = StyleSheet.create({
   deletedText: { fontSize: 13, color: Colors.textMuted, fontStyle: 'italic' },
   sticker: { fontSize: 72, lineHeight: 84 },
   imageBubble: { width: 200, height: 200, borderRadius: 14 },
+  textInputWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    paddingHorizontal: 12,
+    marginHorizontal: 4,
+  },
+  emojiBtn: {
+    padding: 4,
+  },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
