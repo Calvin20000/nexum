@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
-import { ChevronLeft, Send, Users, Smile, Sticker, ImageIcon, Plus, Paperclip } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Send, Users, Smile, Sticker, ImageIcon, Plus, Paperclip, Camera } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { GroupMessage } from '@/types/database';
@@ -50,6 +50,8 @@ export default function GroupChatScreen() {
 
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState<GroupMessage | null>(null);
+  const [showPickerSheet, setShowPickerSheet] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const [pendingImage, setPendingImage] = useState<{ uri: string; mimeType: string } | null>(null);
   const [replyCache, setReplyCache] = useState<Record<string, GroupMessage>>({});
   useEffect(() => { markAsRead(); }, [messages]);
@@ -102,6 +104,22 @@ export default function GroupChatScreen() {
         await uploadAndSendImage(file.uri, file.mimeType ?? 'application/octet-stream');
       }},
     ]);
+  };
+
+  const handlePickImageCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('権限が必要です', 'カメラへのアクセスを許可してください');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+      allowsEditing: true,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    setPendingImage({ uri: asset.uri, mimeType: asset.mimeType ?? 'image/jpeg' });
   };
 
   const handlePickImage = async () => {
@@ -424,32 +442,54 @@ export default function GroupChatScreen() {
           </View>
         )}
         <View style={styles.inputBar}>
-          <TouchableOpacity style={styles.toolBtn} onPress={handlePickImage}>
-            <Plus size={24} color={Colors.textMuted} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.toolBtn} onPress={handlePickFile}>
-            <Paperclip size={22} color={Colors.textMuted} />
-          </TouchableOpacity>
-          <View style={styles.textInputWrapper}>
+          {!isTyping ? (
+            <>
+            <TouchableOpacity style={styles.toolBtn}
+              onPress={()=>setShowPickerSheet(true)}>
+              <Plus size={24} color={Colors.textMuted}/>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.toolBtn}
+              onPress={handlePickImageCamera}>
+              <Camera size={22} color={Colors.textMuted}/>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.toolBtn}
+              onPress={handlePickImage}>
+              <ImageIcon size={22} color={Colors.textMuted}/>
+            </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity style={styles.toolBtn}
+              onPress={()=>setIsTyping(false)}>
+              <ChevronRight size={24} color={Colors.textMuted}/>
+            </TouchableOpacity>
+          )}
+          <View style={{
+            flex:1, flexDirection:'row',
+            alignItems:'flex-end',
+            backgroundColor:Colors.white,
+            borderRadius:22, borderWidth:1,
+            borderColor:Colors.border, minHeight:38
+          }}>
             <TextInput
-              style={styles.textInput}
-              placeholder="メッセージを入力..."
+              style={[styles.textInput,
+                {flex:1, backgroundColor:'transparent', borderWidth:0}]}
+              placeholder='メッセージを入力...'
               placeholderTextColor={Colors.textMuted}
               value={text}
-              onChangeText={setText}
+              onChangeText={(v)=>{setText(v);setIsTyping(v.length>0);}}
               multiline
               maxLength={2000}
               spellCheck={false}
               autoCorrect={false}
-              onFocus={() => { closePanel(); scrollToBottom(); }}
+              onFocus={()=>{closePanel();scrollToBottom();}}
             />
-            <TouchableOpacity style={styles.emojiBtn} onPress={() => openPanel('none')}>
-              <Smile size={20} color={Colors.textMuted} />
+            <TouchableOpacity style={{padding:8}}
+              onPress={()=>openPanel(
+                panel==='sticker'?'none':'sticker')}>
+              <Sticker size={20}
+                color={panel==='sticker'?C.primary:Colors.textMuted}/>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.toolBtn} onPress={() => openPanel('sticker')}>
-            <Sticker size={22} color={Colors.textMuted} />
-          </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.sendBtn, { backgroundColor: C.primary }, (!text.trim() || sending) && styles.sendBtnDisabled]}
@@ -465,6 +505,66 @@ export default function GroupChatScreen() {
         {panel === 'emoji' && <EmojiPicker onSelect={(emoji) => setText((p) => p + emoji)} />}
         {panel === 'sticker' && <StickerPicker onSelect={handleStickerSelect} />}
       </KeyboardAvoidingView>
+      {showPickerSheet && (
+        <View style={{position:'absolute',top:0,left:0,right:0,bottom:0,
+          backgroundColor:'rgba(0,0,0,0.5)'}}>
+          <TouchableOpacity style={{flex:1}}
+            onPress={()=>setShowPickerSheet(false)}/>
+          <View style={{backgroundColor:'white',
+            borderTopLeftRadius:16,borderTopRightRadius:16,padding:16}}>
+            <Text style={{fontSize:16,fontWeight:'700',marginBottom:16}}>
+              送信
+            </Text>
+            <TouchableOpacity
+              style={{flexDirection:'row',alignItems:'center',gap:12,padding:12}}
+              onPress={()=>{setShowPickerSheet(false);handlePickFile();}}>
+              <Paperclip size={22} color='#1976D2'/>
+              <Text>ファイルを送信</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{flexDirection:'row',alignItems:'center',gap:12,padding:12}}
+              onPress={()=>setShowPickerSheet(false)}>
+              <Text style={{fontSize:22}}>location</Text>
+              <Text>位置情報を送信</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{padding:12,alignItems:'center'}}
+              onPress={()=>setShowPickerSheet(false)}>
+              <Text style={{color:'red'}}>キャンセル</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+      {showPickerSheet && (
+        <View style={{position:'absolute',top:0,left:0,right:0,bottom:0,
+          backgroundColor:'rgba(0,0,0,0.5)'}}>
+          <TouchableOpacity style={{flex:1}}
+            onPress={()=>setShowPickerSheet(false)}/>
+          <View style={{backgroundColor:'white',
+            borderTopLeftRadius:16,borderTopRightRadius:16,padding:16}}>
+            <Text style={{fontSize:16,fontWeight:'700',marginBottom:16}}>
+              送信
+            </Text>
+            <TouchableOpacity
+              style={{flexDirection:'row',alignItems:'center',gap:12,padding:12}}
+              onPress={()=>{setShowPickerSheet(false);handlePickFile();}}>
+              <Paperclip size={22} color='#1976D2'/>
+              <Text>ファイルを送信</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{flexDirection:'row',alignItems:'center',gap:12,padding:12}}
+              onPress={()=>setShowPickerSheet(false)}>
+              <Text style={{fontSize:22}}>location</Text>
+              <Text>位置情報を送信</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{padding:12,alignItems:'center'}}
+              onPress={()=>setShowPickerSheet(false)}>
+              <Text style={{color:'red'}}>キャンセル</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
       {pendingImage && (
         <View style={{position:"absolute",top:0,left:0,right:0,bottom:0,backgroundColor:"rgba(0,0,0,0.8)",justifyContent:"center",alignItems:"center"}}>
           <Image source={{uri:pendingImage.uri}} style={{width:300,height:300,borderRadius:12}} resizeMode="contain"/>

@@ -65,7 +65,7 @@ function AuthGuard() {
     const inTabGroup = segments[0] === '(tabs)';
 
     if (session?.user && (inAuthGroup || isRoot)) {
-      router.replace('/(tabs)/friends');
+      router.replace('/(tabs)');
     } else if (!session && (inTabGroup || isRoot)) {
       router.replace('/(auth)/welcome');
     }

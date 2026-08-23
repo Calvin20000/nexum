@@ -98,7 +98,7 @@ export default function TabsLayout() {
 
   return (
     <Tabs
-      initialRouteName="friends"
+      initialRouteName="index"
       screenListeners={{
         focus: () => {
           refreshUnread();

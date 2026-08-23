@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
-import { ChevronLeft, Send, Image as ImageIcon, Smile, Sticker, Camera, X, Paperclip, Plus } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Send, Image as ImageIcon, Smile, Sticker, Camera, X, Paperclip, Plus } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Location from 'expo-location';
@@ -67,6 +67,7 @@ export default function ChatScreen() {
   const [panel, setPanel] = useState<PanelType>('none');
   // Image feature states
   const [showPickerSheet, setShowPickerSheet] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
   const [sendingImage, setSendingImage] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -436,6 +437,7 @@ useFocusEffect(
 
   const handleTextChange = (val: string) => {
     setText(val);
+    setIsTyping(val.length > 0);
     setTyping(true);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => setTyping(false), 2000);
@@ -800,12 +802,7 @@ useFocusEffect(
     }
 
     setUploadError(null);
-    setPendingImage({
-      uri: asset.uri,
-      mimeType: asset.mimeType ?? 'image/jpeg',
-      width: asset.width,
-      height: asset.height,
-    });
+    await uploadAndSendImage(asset.uri, asset.mimeType ?? 'image/jpeg', asset.width, asset.height);
   };
 
   const handlePickFromCamera = async () => {
@@ -1059,27 +1056,33 @@ useFocusEffect(
               </TouchableOpacity>
             )}
             <View style={styles.inputRow}>
-              <TouchableOpacity style={styles.toolBtn} onPress={() => setShowPickerSheet(true)}>
-                <Plus size={24} color={Colors.textMuted} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.toolBtn, panel === 'sticker' && styles.toolBtnActive]}
-                onPress={() => openPanel('sticker')}
-              >
-                <Sticker size={22} color={panel === 'sticker' ? C.primary : Colors.textMuted} />
-              </TouchableOpacity>
+              {!isTyping ? (
+                <>
+                <TouchableOpacity style={styles.toolBtn}
+                  onPress={()=>setShowPickerSheet(true)}>
+                  <Plus size={24} color={Colors.textMuted}/>
+                </TouchableOpacity>
 
 
-              <TouchableOpacity style={styles.toolBtn} onPress={handlePickFromCamera}>
-                <Camera size={22} color={Colors.textMuted} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.toolBtn} onPress={handlePickFromLibrary}>
-                <ImageIcon size={22} color={Colors.textMuted} />
-              </TouchableOpacity>
-
+                <TouchableOpacity style={styles.toolBtn}
+                  onPress={handlePickFromCamera}>
+                  <Camera size={22} color={Colors.textMuted}/>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.toolBtn}
+                  onPress={handlePickFromLibrary}>
+                  <ImageIcon size={22} color={Colors.textMuted}/>
+                </TouchableOpacity>
+                </>
+              ) : (
+                <TouchableOpacity style={styles.toolBtn}
+                  onPress={()=>setIsTyping(false)}>
+                  <ChevronRight size={24} color={Colors.textMuted}/>
+                </TouchableOpacity>
+              )}
+<View style={{flex:1, flexDirection:'row', alignItems:'flex-end', backgroundColor:Colors.inputBackground, borderRadius:22, borderWidth:1, borderColor:Colors.border, minHeight:38}}>
               <TextInput
                 ref={inputRef}
-                style={styles.textInput}
+               style={[styles.textInput, {flex:1, backgroundColor:'transparent', borderWidth:0}]}
                 placeholder="メッセージを入力..."
                 placeholderTextColor={Colors.textMuted}
                 value={text}
@@ -1093,6 +1096,10 @@ useFocusEffect(
                   scrollToBottom();
                 }}
               />
+              <TouchableOpacity style={{padding:8}} onPress={()=>openPanel(panel==='sticker'?'none':'sticker')}>
+                <Sticker size={20} color={panel==='sticker'?C.primary:Colors.textMuted}/>
+              </TouchableOpacity>
+              </View>
 
               <TouchableOpacity
                 style={[styles.sendBtn, (!text.trim() || sending) && styles.sendBtnDisabled]}
