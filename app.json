@@ -35,7 +35,9 @@
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",
         "android.permission.POST_NOTIFICATIONS",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
       ],
       "jsEngine": "jsc"
     },
@@ -62,7 +64,8 @@
         {
           "photosPermission": "画像を送信するために写真へのアクセスを許可します。"
         }
-      ]
+      ],
+      "expo-location"
     ],
     "experiments": {
       "typedRoutes": true
