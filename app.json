@@ -36,7 +36,8 @@
         "android.permission.VIBRATE",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "jsEngine": "jsc"
     },
     "web": {
       "bundler": "metro",
