@@ -25,6 +25,7 @@ import { Friendship, UserProfile } from '@/types/database';
 import { Avatar } from '@/components/Avatar';
 import { Colors } from '@/lib/colors';
 import { useColors } from '@/lib/theme';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 function useSkeletonPulse() {
   const anim = useRef(new Animated.Value(0.4)).current;
@@ -91,6 +92,7 @@ interface FriendGroup {
 export default function FriendsScreen() {
   const { session } = useAuthStore();
   const C = useColors();
+  const { t } = useTranslation();
   const [friends, setFriends] = useState<FriendWithUser[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -414,9 +416,9 @@ export default function FriendsScreen() {
     : friends;
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: C.primary }]}>フレンド</Text>
+    <SafeAreaView edges={["top","left","right"]} style={[styles.safe, { backgroundColor: C.background }]}>
+      <View style={[styles.header, { backgroundColor: C.white, borderBottomColor: C.separator }]}>
+        <Text style={[styles.headerTitle, { color: C.primary }]}>{t('friends')}</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/friend/requests')}>
             <Bell size={20} color={C.primary} />
@@ -434,6 +436,7 @@ export default function FriendsScreen() {
         <FriendsListSkeleton />
       ) : (
         <ScrollView
+          style={{ backgroundColor: C.background }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

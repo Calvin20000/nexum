@@ -251,8 +251,8 @@ export default function ChatsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.header}>
+      <SafeAreaView edges={["top","left","right"]} style={[styles.safe, { backgroundColor: C.background }]}>
+        <View style={[styles.header, { backgroundColor: C.white, borderBottomColor: C.separator }]}>
           <Text style={[styles.headerTitle, { color: C.primary }]}>NEXUM</Text>
         </View>
         <ChatListSkeleton />
@@ -261,8 +261,8 @@ export default function ChatsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
+    <SafeAreaView edges={["top","left","right"]} style={[styles.safe, { backgroundColor: C.background }]}>
+      <View style={[styles.header, { backgroundColor: C.white, borderBottomColor: C.separator }]}>
         <Text style={[styles.headerTitle, { color: C.primary }]}>NEXUM</Text>
 
       </View>
@@ -280,6 +280,7 @@ export default function ChatsScreen() {
         </View>
       ) : (
         <FlatList
+          style={{ backgroundColor: C.background }}
           data={uniqueChatItems}
           keyExtractor={(item) => item.type + '_' + item.data.id}
           renderItem={({ item }) => {

@@ -20,11 +20,13 @@ import { Avatar } from '@/components/Avatar';
 import { Colors } from '@/lib/colors';
 import { PhotoGallery } from '@/components/PhotoGallery';
 import { useTheme, useColors } from '@/lib/theme';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 export default function ProfileScreen() {
   const { profile, session, signOut, fetchProfile } = useAuthStore();
   const { primaryColor } = useTheme();
   const C = useColors();
+  const { t } = useTranslation();
   const [showQR, setShowQR] = useState(false);
   const [copied, setCopied] = useState(false);
   const insets = useSafeAreaInsets();
@@ -64,7 +66,7 @@ export default function ProfileScreen() {
 
   if (!profile) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <SafeAreaView edges={["top","left","right"]} style={[styles.safe, { backgroundColor: C.background }]}>
         <View style={styles.center}>
           <Text style={styles.loadingText}>読み込み中...</Text>
         </View>
@@ -75,7 +77,7 @@ export default function ProfileScreen() {
   const qrValue = `nexum://add/${profile.handle}`;
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView edges={["top","left","right"]} style={[styles.safe, { backgroundColor: C.background }]}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <LinearGradient
           colors={[primaryColor, primaryColor + 'CC']}
@@ -123,7 +125,7 @@ export default function ProfileScreen() {
             onPress={() => router.push('/profile/edit')}
           >
             <Edit2 size={18} color={Colors.white} />
-            <Text style={styles.editBtnText}>プロフィールを編集</Text>
+            <Text style={styles.editBtnText}>{t('editProfile')}</Text>
           </TouchableOpacity>
         </View>
 

@@ -908,7 +908,7 @@ useFocusEffect(
   if (loading) {
     return (
       <View style={[styles.rootWrapper, webStyle]}>
-        <SafeAreaView style={styles.safe}>
+        <SafeAreaView edges={["top","left","right"]} style={[styles.safe, { backgroundColor: C.background }]}>
           <View style={styles.center}>
             <ActivityIndicator size="large" color={C.primary} />
           </View>
@@ -920,8 +920,8 @@ useFocusEffect(
   if (loadError) {
     return (
       <View style={[styles.rootWrapper, webStyle]}>
-        <SafeAreaView style={styles.safe}>
-          <View style={styles.header}>
+        <SafeAreaView edges={["top","left","right"]} style={[styles.safe, { backgroundColor: C.background }]}>
+          <View style={[styles.header, { backgroundColor: C.white, borderBottomColor: C.separator }]}>
             <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
               <ChevronLeft size={26} color={C.primary} />
             </TouchableOpacity>
@@ -939,8 +939,8 @@ useFocusEffect(
 
   return (
     <View style={[styles.rootWrapper, webStyle]}>
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.header}>
+      <SafeAreaView edges={["top","left","right"]} style={[styles.safe, { backgroundColor: C.background }]}>
+        <View style={[styles.header, { backgroundColor: C.white, borderBottomColor: C.separator }]}>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <ChevronLeft size={26} color={C.primary} />
           </TouchableOpacity>

@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import { MessageCircle, Users, User, Settings } from 'lucide-react-native';
 import { Colors } from '@/lib/colors';
 import { useColors } from '@/lib/theme';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
@@ -95,6 +96,7 @@ export default function TabsLayout() {
     };
   }, [refreshUnread]);
   const C = useColors();
+  const { t } = useTranslation();
 
   return (
     <Tabs
@@ -113,7 +115,7 @@ export default function TabsLayout() {
           borderTopColor: Colors.separator,
           borderTopWidth: 1,
           height: tabBarHeight,
-          paddingBottom: insets.bottom + 4,
+          paddingBottom: insets.bottom,
           paddingTop: 8,
           elevation: 8,
           shadowColor: '#000',
@@ -130,14 +132,14 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="friends"
         options={{
-          title: 'フレンド',
+          title: t('friends'),
           tabBarIcon: ({ color, size }) => <Users size={size} color={color} strokeWidth={2} />,
         }}
       />
       <Tabs.Screen
         name="index"
         options={{
-          title: 'チャット',
+          title: t('chat'),
           tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : undefined,
           tabBarBadgeStyle: {
             backgroundColor: '#F44336',
@@ -153,14 +155,14 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'プロフィール',
+          title: t('profile'),
           tabBarIcon: ({ color, size }) => <User size={size} color={color} strokeWidth={2} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: '設定',
+          title: t('settings'),
           tabBarIcon: ({ color, size }) => <Settings size={size} color={color} strokeWidth={2} />,
         }}
       />

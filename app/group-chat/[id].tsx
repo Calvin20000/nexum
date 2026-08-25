@@ -341,7 +341,7 @@ export default function GroupChatScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <SafeAreaView edges={["top","left","right"]} style={[styles.safe, { backgroundColor: C.background }]}>
         <View style={styles.center}>
           <ActivityIndicator size="large" color={C.primary} />
         </View>
@@ -350,8 +350,8 @@ export default function GroupChatScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
+    <SafeAreaView edges={["top","left","right"]} style={[styles.safe, { backgroundColor: C.background }]}>
+      <View style={[styles.header, { backgroundColor: C.white, borderBottomColor: C.separator }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <ChevronLeft size={26} color={C.primary} />
         </TouchableOpacity>
@@ -655,7 +655,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.white,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#E0E0E0',

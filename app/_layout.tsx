@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
+import { Platform, View } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -10,7 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
 import { InAppNotification, InAppNotificationRef } from '@/components/ui/InAppNotification';
 import { registerPushToken } from '@/hooks/usePushNotification';
-import { ThemeProvider } from '@/lib/theme';
+import { ThemeProvider, useColors } from '@/lib/theme';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -74,6 +74,15 @@ function AuthGuard() {
   return null;
 }
 
+function DarkWrapper({ children }: { children: React.ReactNode }) {
+  const C = useColors();
+  return (
+    <View style={{ flex: 1, backgroundColor: C.background }}>
+      {children}
+    </View>
+  );
+}
+
 export default function RootLayout() {
   useFrameworkReady();
   const router = useRouter();
@@ -86,7 +95,7 @@ export default function RootLayout() {
       Notifications.deleteNotificationChannelAsync('messages').catch(() => {});
       Notifications.setNotificationChannelAsync('messages', {
         name: 'メッセージ通知',
-        importance: Notifications.AndroidImportance.LOW,
+        importance: Notifications.AndroidImportance.NONE,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#1976D2',
         sound: 'default',
@@ -115,6 +124,7 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
+      <DarkWrapper>
       <QueryClientProvider client={queryClient}>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(auth)" />
@@ -125,12 +135,14 @@ export default function RootLayout() {
           <Stack.Screen name="profile/edit" options={{ presentation: 'modal' }} />
           <Stack.Screen name="friend/search" options={{ presentation: 'card' }} />
           <Stack.Screen name="friend/requests" options={{ presentation: 'card' }} />
+          <Stack.Screen name="settings/language" options={{ presentation: 'card' }} />
           <Stack.Screen name="+not-found" />
         </Stack>
         <AuthGuard />
         <StatusBar style="auto" />
         <InAppNotification ref={notificationRef} />
       </QueryClientProvider>
+      </DarkWrapper>
     </ThemeProvider>
   );
 }

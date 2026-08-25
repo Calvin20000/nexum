@@ -65,7 +65,8 @@
           "photosPermission": "画像を送信するために写真へのアクセスを許可します。"
         }
       ],
-      "expo-location"
+      "expo-location",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true

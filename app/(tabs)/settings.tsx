@@ -9,16 +9,29 @@ import {
   Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 import { Bell, Lock, Info, ChevronRight, LogOut, Volume2, Vibrate, MessageSquare, Palette, X, Check } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { setLanguage } from '@/lib/i18n/useTranslation';
 import { Colors } from '@/lib/colors';
 import { useAuthStore } from '@/stores/authStore';
-import { useTheme, THEME_COLORS } from '@/lib/theme';
+import { useTheme, THEME_COLORS, useColors } from '@/lib/theme';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 export const SOUND_ENABLED_KEY = 'sound_enabled';
 export const VIBRATE_ENABLED_KEY = 'vibrate_enabled';
 export const MESSAGE_PREVIEW_KEY = 'message_preview_enabled';
 export const SELECTED_SOUND_KEY = 'selected_sound';
+
+const LANGUAGE_OPTIONS = [
+  { id: 'ja', label: '日本語' },
+  { id: 'en', label: 'English' },
+  { id: 'zh-Hans', label: '简体中文' },
+  { id: 'zh-Hant', label: '繁體中文' },
+] as const;
+type LanguageId = typeof LANGUAGE_OPTIONS[number]['id'];
+export const SELECTED_LANGUAGE_KEY = 'selected_language';
 
 const SOUND_OPTIONS = [
   { id: 'default', label: 'デフォルト' },
@@ -33,13 +46,25 @@ type SoundId = typeof SOUND_OPTIONS[number]['id'];
 
 export default function SettingsScreen() {
   const { profile, signOut } = useAuthStore();
-  const { primaryColor, setPrimaryColor } = useTheme();
+  const { primaryColor, setPrimaryColor, setIsDark } = useTheme();
+  const C = useColors();
+  const { t } = useTranslation();
   const [notifications, setNotifications] = React.useState(true);
   const [messagePreview, setMessagePreview] = React.useState(true);
   const [soundEnabled, setSoundEnabled] = React.useState(true);
   const [vibrateEnabled, setVibrateEnabled] = React.useState(true);
   const [selectedSound, setSelectedSound] = React.useState<SoundId>('default');
   const [showSoundModal, setShowSoundModal] = React.useState(false);
+  const [selectedLanguage, setSelectedLanguage] = React.useState<LanguageId>('ja');
+  const [showLanguageModal, setShowLanguageModal] = React.useState(false);
+  useFocusEffect(
+    useCallback(() => {
+      AsyncStorage.getItem(SELECTED_LANGUAGE_KEY).then((val) => {
+        if (val !== null) setSelectedLanguage(val as LanguageId);
+      });
+    }, [])
+  );
+  const [isDarkMode, setIsDarkMode] = React.useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem(SOUND_ENABLED_KEY).then((val) => {
@@ -47,6 +72,12 @@ export default function SettingsScreen() {
     });
     AsyncStorage.getItem(VIBRATE_ENABLED_KEY).then((val) => {
       if (val !== null) setVibrateEnabled(val !== 'false');
+    });
+    AsyncStorage.getItem(SELECTED_LANGUAGE_KEY).then((val) => {
+      if (val !== null) setSelectedLanguage(val as LanguageId);
+    });
+    AsyncStorage.getItem('dark_mode').then((val) => {
+      if (val !== null) setIsDarkMode(val === 'true');
     });
     AsyncStorage.getItem(MESSAGE_PREVIEW_KEY).then((val) => {
       if (val !== null) setMessagePreview(val !== 'false');
@@ -80,20 +111,20 @@ export default function SettingsScreen() {
   const soundLabel = SOUND_OPTIONS.find((o) => o.id === selectedSound)?.label ?? 'デフォルト';
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>設定</Text>
+    <SafeAreaView edges={["top","left","right"]} style={[styles.safe, { backgroundColor: C.background }]}>
+      <View style={[styles.header, { backgroundColor: C.white, borderBottomColor: C.separator }]}>
+        <Text style={[styles.headerTitle, { color: C.textPrimary }]}>{t('settings')}</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.section}>通知</Text>
-        <View style={styles.card}>
+        <Text style={styles.section}>{t('notifications')}</Text>
+        <View style={[styles.card, { backgroundColor: C.white }]}>
           <View style={styles.row}>
             <View style={styles.rowLeft}>
               <View style={[styles.iconBox, { backgroundColor: '#E3F2FD' }]}>
                 <Bell size={18} color={primaryColor} />
               </View>
-              <Text style={styles.rowLabel}>プッシュ通知</Text>
+              <Text style={[styles.rowLabel, { color: C.textPrimary }]}>プッシュ通知</Text>
             </View>
             <Switch
               value={notifications}
@@ -109,7 +140,7 @@ export default function SettingsScreen() {
                 <Volume2 size={18} color={primaryColor} />
               </View>
               <View>
-                <Text style={styles.rowLabel}>着信音</Text>
+                <Text style={[styles.rowLabel, { color: C.textPrimary }]}>着信音</Text>
                 <Text style={styles.rowSub}>{soundLabel}</Text>
               </View>
             </View>
@@ -121,7 +152,7 @@ export default function SettingsScreen() {
               <View style={[styles.iconBox, { backgroundColor: '#E3F2FD' }]}>
                 <Vibrate size={18} color={primaryColor} />
               </View>
-              <Text style={styles.rowLabel}>バイブレーション</Text>
+              <Text style={[styles.rowLabel, { color: C.textPrimary }]}>バイブレーション</Text>
             </View>
             <Switch
               value={vibrateEnabled}
@@ -137,7 +168,7 @@ export default function SettingsScreen() {
                 <MessageSquare size={18} color={primaryColor} />
               </View>
               <View>
-                <Text style={styles.rowLabel}>メッセージプレビュー</Text>
+                <Text style={[styles.rowLabel, { color: C.textPrimary }]}>メッセージプレビュー</Text>
                 <Text style={styles.rowSub}>チャット一覧にメッセージ内容を表示</Text>
               </View>
             </View>
@@ -150,14 +181,51 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        <Text style={styles.section}>テーマ</Text>
-        <View style={styles.card}>
+        <Text style={styles.section}>{t('language')}</Text>
+        <View style={[styles.card, { backgroundColor: C.white }]}>
+          <TouchableOpacity style={styles.row} onPress={() => router.push('/settings/language' as any)}>
+            <View style={styles.rowLeft}>
+              <View style={[styles.iconBox, { backgroundColor: '#E3F2FD' }]}>
+                <ChevronRight size={18} color='#1976D2' />
+              </View>
+              <Text style={[styles.rowLabel, { color: C.textPrimary }]}>使用言語</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={{ color: '#757575', fontSize: 14 }}>
+                {LANGUAGE_OPTIONS.find(l => l.id === selectedLanguage)?.label}
+              </Text>
+              <ChevronRight size={16} color='#9E9E9E' />
+            </View>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.section}>{t('appearance')}</Text>
+        <View style={[styles.card, { backgroundColor: C.white }]}>
+          <View style={styles.row}>
+            <View style={styles.rowLeft}>
+              <View style={[styles.iconBox, { backgroundColor: '#212121' }]}>
+                <Palette size={18} color='#FFFFFF' />
+              </View>
+              <Text style={[styles.rowLabel, { color: C.textPrimary }]}>{t('darkMode')}</Text>
+            </View>
+            <Switch
+              value={isDarkMode}
+              onValueChange={(val) => {
+                setIsDarkMode(val);
+                setIsDark(val);
+              }}
+              trackColor={{ false: '#E0E0E0', true: '#1976D2' }}
+              thumbColor='#FFFFFF'
+            />
+          </View>
+        </View>
+        <Text style={styles.section}>{t('theme')}</Text>
+        <View style={[styles.card, { backgroundColor: C.white }]}>
           <View style={styles.themeRow}>
             <View style={styles.rowLeft}>
               <View style={[styles.iconBox, { backgroundColor: '#E3F2FD' }]}>
                 <Palette size={18} color={primaryColor} />
               </View>
-              <Text style={styles.rowLabel}>テーマカラー</Text>
+              <Text style={[styles.rowLabel, { color: C.textPrimary }]}>{t('themeColor')}</Text>
             </View>
             <View style={styles.colorGrid}>
               {THEME_COLORS.map((item) => {
@@ -193,26 +261,26 @@ export default function SettingsScreen() {
         </View>
 
         <Text style={styles.section}>プライバシー</Text>
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: C.white }]}>
           <TouchableOpacity style={styles.row}>
             <View style={styles.rowLeft}>
               <View style={[styles.iconBox, { backgroundColor: '#E8F5E9' }]}>
                 <Lock size={18} color={Colors.success} />
               </View>
-              <Text style={styles.rowLabel}>ブロックリスト</Text>
+              <Text style={[styles.rowLabel, { color: C.textPrimary }]}>ブロックリスト</Text>
             </View>
             <ChevronRight size={18} color={Colors.textMuted} />
           </TouchableOpacity>
         </View>
 
         <Text style={styles.section}>アプリ情報</Text>
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: C.white }]}>
           <View style={styles.row}>
             <View style={styles.rowLeft}>
               <View style={[styles.iconBox, { backgroundColor: '#FFF8E1' }]}>
                 <Info size={18} color={Colors.warning} />
               </View>
-              <Text style={styles.rowLabel}>バージョン</Text>
+              <Text style={[styles.rowLabel, { color: C.textPrimary }]}>{t('version')}</Text>
             </View>
             <Text style={styles.rowValue}>1.0.0</Text>
           </View>
@@ -223,9 +291,53 @@ export default function SettingsScreen() {
           <Text style={styles.profileHandle}>@{profile?.handle}</Text>
         </View>
 
+        <Text style={styles.section}>{t('about')}</Text>
+        <View style={[styles.card, { backgroundColor: C.white }]}>
+          <TouchableOpacity style={styles.row}
+            onPress={()=>require('expo-linking').openURL('https://calvin20000.github.io/nexum/privacy.html')}>
+            <View style={styles.rowLeft}>
+              <View style={[styles.iconBox,{backgroundColor:'#E3F2FD'}]}>
+                <Lock size={18} color='#1976D2' />
+              </View>
+              <Text style={[styles.rowLabel, { color: C.textPrimary }]}>{t('privacy')}</Text>
+            </View>
+            <ChevronRight size={16} color='#9E9E9E' />
+          </TouchableOpacity>
+          <View style={styles.separator} />
+          <TouchableOpacity style={styles.row}
+            onPress={()=>require('expo-linking').openURL('https://calvin20000.github.io/nexum/terms.html')}>
+            <View style={styles.rowLeft}>
+              <View style={[styles.iconBox,{backgroundColor:'#E3F2FD'}]}>
+                <Info size={18} color='#1976D2' />
+              </View>
+              <Text style={[styles.rowLabel, { color: C.textPrimary }]}>{t('terms')}</Text>
+            </View>
+            <ChevronRight size={16} color='#9E9E9E' />
+          </TouchableOpacity>
+          <View style={styles.separator} />
+          <View style={styles.row}>
+            <View style={styles.rowLeft}>
+              <View style={[styles.iconBox,{backgroundColor:'#E3F2FD'}]}>
+                <Info size={18} color='#1976D2' />
+              </View>
+              <Text style={[styles.rowLabel, { color: C.textPrimary }]}>{t('version')}</Text>
+            </View>
+            <Text style={{color:'#9E9E9E',fontSize:14}}>1.0.0</Text>
+          </View>
+        </View>
+        <View style={{backgroundColor:'#E3F2FD',borderRadius:12,padding:16,marginBottom:16}}>
+          <Text style={{color:'#1976D2',fontWeight:'700',fontSize:14,marginBottom:4}}>
+            プライバシーへの取り組み
+          </Text>
+          <Text style={{color:'#424242',fontSize:13,lineHeight:20}}>
+            NEXUMは広告なし・データ収集なし・トラッキングなしで運営しています。
+            あなたのデータは認証とチャット提供のみに使用され、
+            第三者に提供されることは一切ありません。
+          </Text>
+        </View>
         <TouchableOpacity style={styles.logoutBtn} onPress={signOut}>
           <LogOut size={18} color={Colors.error} />
-          <Text style={styles.logoutText}>ログアウト</Text>
+          <Text style={styles.logoutText}>{t('logout')}</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -257,6 +369,32 @@ export default function SettingsScreen() {
                 </React.Fragment>
               );
             })}
+          </View>
+        </View>
+      </Modal>
+      <Modal visible={showLanguageModal} transparent animationType='slide' onRequestClose={() => setShowLanguageModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>言語を選択</Text>
+              <TouchableOpacity onPress={() => setShowLanguageModal(false)}>
+                <X size={22} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            {LANGUAGE_OPTIONS.map((lang) => (
+              <TouchableOpacity
+                key={lang.id}
+                style={styles.soundOption}
+                onPress={() => {
+                  setSelectedLanguage(lang.id);
+                  setLanguage(lang.id);
+                  setShowLanguageModal(false);
+                }}
+              >
+                <Text style={styles.soundOptionText}>{lang.label}</Text>
+                {selectedLanguage === lang.id && <Check size={18} color='#1976D2' />}
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
       </Modal>
