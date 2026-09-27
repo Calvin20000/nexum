@@ -3,35 +3,264 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NEXUM 利用規約</title>
+<title>Fumiliber（フミリベ）- 利用規約</title>
 <style>
-body{font-family:sans-serif;max-width:800px;margin:0 auto;padding:24px 20px;color:#212121;line-height:1.8;}
-h1{color:#0D47A1;border-bottom:2px solid #0D47A1;padding-bottom:8px;}
-h2{color:#1976D2;margin-top:32px;}
-.box{background:#E3F2FD;border-left:4px solid #1976D2;padding:12px 16px;border-radius:4px;margin:16px 0;}
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #212121;
+    background: #FAFAFA;
+    line-height: 1.8;
+  }
+
+  header {
+    background: #0D47A1;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .logo {
+    color: #FFFFFF;
+    font-size: 24px;
+    font-weight: 800;
+    text-decoration: none;
+    letter-spacing: 1px;
+  }
+  .logo span {
+    font-size: 12px;
+    display: block;
+    font-weight: 300;
+    letter-spacing: 2px;
+    opacity: 0.8;
+  }
+  nav a {
+    color: #FFFFFF;
+    text-decoration: none;
+    margin-left: 24px;
+    font-size: 14px;
+    opacity: 0.9;
+  }
+
+  .hero {
+    background: linear-gradient(135deg, #0D47A1 0%, #1976D2 100%);
+    color: #FFFFFF;
+    text-align: center;
+    padding: 48px 24px;
+  }
+  .hero h1 {
+    font-size: 32px;
+    font-weight: 800;
+    margin-bottom: 8px;
+  }
+  .hero p {
+    font-size: 14px;
+    opacity: 0.8;
+  }
+
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 48px 24px;
+  }
+
+  h2 {
+    color: #1976D2;
+    font-size: 18px;
+    margin-top: 40px;
+    margin-bottom: 12px;
+    border-left: 4px solid #1976D2;
+    padding-left: 12px;
+  }
+
+  p { margin: 8px 0; font-size: 15px; color: #424242; }
+  ul { padding-left: 24px; margin: 8px 0; }
+  li { margin: 6px 0; font-size: 15px; color: #424242; }
+
+  .highlight {
+    background: #E3F2FD;
+    border-left: 4px solid #1976D2;
+    padding: 16px 20px;
+    border-radius: 4px;
+    margin: 20px 0;
+    font-size: 15px;
+    color: #0D47A1;
+  }
+
+  .warning {
+    background: #FFF3E0;
+    border-left: 4px solid #FF6F00;
+    padding: 16px 20px;
+    border-radius: 4px;
+    margin: 20px 0;
+    font-size: 15px;
+    color: #E65100;
+  }
+
+  footer {
+    background: #212121;
+    color: #FFFFFF;
+    padding: 32px 24px;
+    text-align: center;
+  }
+  footer .footer-logo {
+    font-size: 22px;
+    font-weight: 800;
+    margin-bottom: 16px;
+  }
+  footer .footer-links {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  footer .footer-links a {
+    color: #FFFFFF;
+    text-decoration: none;
+    font-size: 14px;
+    opacity: 0.7;
+  }
+  footer .copyright {
+    font-size: 13px;
+    opacity: 0.4;
+  }
+
+  @media (max-width: 600px) {
+    nav { display: none; }
+  }
 </style>
 </head>
 <body>
-<h1>NEXUM 利用規約</h1>
-<p>最終更新日：2026年8月23日</p>
-<div class="box">NEXUMをご利用いただくことで、本利用規約に同意したものとみなします。</div>
-<h2>1. サービスの概要</h2>
-<p>NEXUMは広告なし・データ収集なし・トラッキングなしのプライバシー重視のチャットアプリです。</p>
-<h2>2. 利用資格</h2>
-<p>本サービスは13歳以上の方を対象としています。</p>
-<h2>3. 禁止事項</h2>
-<ul>
-<li>他のユーザーへの嫌がらせ・誹謗中傷</li>
-<li>違法なコンテンツの送受信</li>
-<li>スパム行為</li>
-<li>サービスの不正利用</li>
-</ul>
-<h2>4. サービスの変更</h2>
-<p>本サービスの内容・機能は変更される場合があります。重要な変更はアプリ内でお知らせします。将来的に有料機能を追加する場合も、基本チャット機能は無料で継続します。</p>
-<h2>5. 免責事項</h2>
-<p>サービスの中断・データ損失等について、開発者は責任を負いません。</p>
-<h2>6. お問い合わせ</h2>
-<p>GitHub: <a href="https://github.com/Calvin20000/nexum">https://github.com/Calvin20000/nexum</a></p>
-<p>© 2026 NEXUM All rights reserved.</p>
+
+<!-- ヘッダー -->
+<header>
+  <a href="index.html" class="logo">
+    Fumiliber
+    <span>フミリベ</span>
+  </a>
+  <nav>
+    <a href="index.html">トップ</a>
+    <a href="privacy.html">プライバシーポリシー</a>
+  </nav>
+</header>
+
+<!-- ヒーロー -->
+<div class="hero">
+  <h1>利用規約</h1>
+  <p>最終更新日：2026年9月27日</p>
+</div>
+
+<!-- 本文 -->
+<div class="container">
+
+  <div class="highlight">
+    Fumiliber（フミリベ）をご利用いただくことで、本利用規約に同意したものとみなします。ご利用前に必ずお読みください。
+  </div>
+
+  <h2>第1条　サービスの概要</h2>
+  <p>Fumiliber（フミリベ）は、「Liber（ラテン語：自由）」を語源とする、プライバシーを最優先に設計されたコミュニケーションアプリです。広告なし・データ収集なし・トラッキングなしを徹底し、ユーザーが自由につながれる環境を提供します。</p>
+
+  <h2>第2条　利用資格</h2>
+  <ul>
+    <li>本サービスは13歳以上の方を対象としています</li>
+    <li>13歳未満の方の利用はできません</li>
+    <li>未成年者は保護者の同意を得てご利用ください</li>
+    <li>本規約に同意できない方はご利用いただけません</li>
+  </ul>
+
+  <h2>第3条　アカウント</h2>
+  <ul>
+    <li>登録にはメールアドレスが必要です</li>
+    <li>正確な情報を登録してください</li>
+    <li>アカウントの管理はユーザー自身の責任です</li>
+    <li>1人1アカウントとします</li>
+    <li>アカウントの譲渡・売買は禁止です</li>
+  </ul>
+
+  <h2>第4条　禁止事項</h2>
+  <p>以下の行為を禁止します。</p>
+  <ul>
+    <li>他のユーザーへの嫌がらせ・誹謗中傷・脅迫</li>
+    <li>違法なコンテンツの送受信・共有</li>
+    <li>著作権・商標権などの知的財産権の侵害</li>
+    <li>スパム行為・大量メッセージの送信</li>
+    <li>フィッシング・詐欺行為</li>
+    <li>マルウェア・ウイルスの配布</li>
+    <li>未成年者への不適切なコンテンツの送信</li>
+    <li>他者のプライバシーを侵害する行為</li>
+    <li>サービスへの不正アクセス・改ざん</li>
+    <li>商業目的での無断利用</li>
+    <li>その他法令に違反する行為</li>
+  </ul>
+
+  <div class="warning">
+    禁止事項に違反した場合、予告なくアカウントを停止・削除する場合があります。
+  </div>
+
+  <h2>第5条　コンテンツについて</h2>
+  <ul>
+    <li>ユーザーが送信したコンテンツの著作権はユーザーに帰属します</li>
+    <li>送信したコンテンツはサービス提供のために使用されます</li>
+    <li>違法・有害なコンテンツは削除する場合があります</li>
+    <li>プロフィールに投稿する画像・動画は自身の権利を有するものに限ります</li>
+  </ul>
+
+  <h2>第6条　プライバシー</h2>
+  <p>個人情報の取り扱いについては、別途定めるプライバシーポリシーに従います。Fumiliberは広告なし・データ収集なし・トラッキングなしを徹底しています。</p>
+  <p><a href="privacy.html" style="color:#1976D2;">プライバシーポリシーはこちら</a></p>
+
+  <h2>第7条　サービスの変更・終了</h2>
+  <ul>
+    <li>本サービスの内容・機能は予告なく変更される場合があります</li>
+    <li>重要な変更はアプリ内でお知らせします</li>
+    <li>将来的に有料機能を追加する場合も、基本チャット機能は無料で継続します</li>
+    <li>サービスを終了する場合は、事前にお知らせします</li>
+  </ul>
+
+  <h2>第8条　免責事項</h2>
+  <ul>
+    <li>サービスの中断・停止によるいかなる損害も責任を負いません</li>
+    <li>ユーザー間のトラブルには関与しません</li>
+    <li>データの損失について責任を負いません</li>
+    <li>本サービスはAS IS（現状のまま）で提供されます</li>
+  </ul>
+
+  <h2>第9条　知的財産権</h2>
+  <p>Fumiliberのロゴ・デザイン・ブランド名に関する知的財産権は開発者に帰属します。無断での使用・複製・転用を禁止します。</p>
+
+  <h2>第10条　アカウントの削除</h2>
+  <ul>
+    <li>ユーザーはいつでもアカウントを削除できます</li>
+    <li>削除後30日以内に全データを完全に消去します</li>
+    <li>削除後の復元はできません</li>
+  </ul>
+
+  <h2>第11条　準拠法・管轄裁判所</h2>
+  <p>本規約は日本法に準拠します。本サービスに関する紛争については、開発者の所在地を管轄する裁判所を専属的合意管轄とします。</p>
+
+  <h2>第12条　規約の変更</h2>
+  <p>本規約を変更する場合は、アプリ内およびWebサイトでお知らせします。重要な変更の場合は、登録メールアドレスへの通知も行います。変更後も継続してご利用いただいた場合、変更後の規約に同意したものとみなします。</p>
+
+  <h2>第13条　お問い合わせ</h2>
+  <p>本規約に関するお問い合わせは以下よりご連絡ください。</p>
+  <p style="margin-top:8px;">
+    メール：<a href="mailto:support@fumiliber.com" style="color:#1976D2;">support@fumiliber.com</a><br>
+    GitHub：<a href="https://github.com/Calvin20000/nexum" style="color:#1976D2;">https://github.com/Calvin20000/nexum</a>
+  </p>
+
+</div>
+
+<!-- フッター -->
+<footer>
+  <div class="footer-logo">Fumiliber</div>
+  <div class="footer-links">
+    <a href="index.html">トップ</a>
+    <a href="privacy.html">プライバシーポリシー</a>
+    <a href="mailto:support@fumiliber.com">お問い合わせ</a>
+  </div>
+  <p class="copyright">© 2026 Fumiliber Dev. All rights reserved.</p>
+</footer>
+
 </body>
 </html>
