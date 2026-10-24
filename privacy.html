@@ -158,7 +158,12 @@ footer {
 
 <h2>14. お問い合わせ</h2>
 <p>プライバシーに関するご質問・お問い合わせ、データの削除・開示申請は以下よりご連絡ください。</p>
-<p>お問い合わせは<a href="https://formspree.io/f/xyeezwld">こちらのフォーム</a>からご連絡ください。</p>
+<form method="POST" action="https://formspree.io/f/xyeezwld" style="margin-top:16px;">
+  <div style="margin-bottom:12px;"><label>お名前<br><input type="text" name="name" style="width:100%;padding:8px;margin-top:4px;border:1px solid #ccc;border-radius:4px;"></label></div>
+  <div style="margin-bottom:12px;"><label>メールアドレス<br><input type="email" name="email" required style="width:100%;padding:8px;margin-top:4px;border:1px solid #ccc;border-radius:4px;"></label></div>
+  <div style="margin-bottom:12px;"><label>お問い合わせ内容<br><textarea name="message" rows="5" required style="width:100%;padding:8px;margin-top:4px;border:1px solid #ccc;border-radius:4px;"></textarea></label></div>
+  <button type="submit" style="background:#1976D2;color:white;padding:10px 24px;border:none;border-radius:4px;cursor:pointer;">送信</button>
+</form>
 
 <footer>
   <p>© 2026 Fumiliber Dev. All rights reserved.</p>
