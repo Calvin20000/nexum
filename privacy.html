@@ -164,6 +164,25 @@ footer {
   <div style="margin-bottom:12px;"><label>お問い合わせ内容<br><textarea name="message" rows="5" required style="width:100%;padding:8px;margin-top:4px;border:1px solid #ccc;border-radius:4px;"></textarea></label></div>
   <button type="submit" style="background:#1976D2;color:white;padding:10px 24px;border:none;border-radius:4px;cursor:pointer;">送信</button>
 </form>
+<script>
+document.querySelector("form").addEventListener("submit", function(e) {
+  e.preventDefault();
+  fetch("https://formspree.io/f/xyeezwld", {
+    method: "POST",
+    body: new FormData(this),
+    headers: { Accept: "application/json" }
+  }).then(function(res) {
+    if (res.ok) {
+      alert("送信しました。ありがとうございます。");
+      document.querySelector("form").reset();
+    } else {
+      alert("送信に失敗しました。再度お試しください。");
+    }
+  });
+});
+</script>
+<p style="display:none">
+</form>
 
 <footer>
   <p>© 2026 Fumiliber Dev. All rights reserved.</p>
