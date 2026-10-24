@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "48822261297",
+    "project_id": "fumiliber-e55e6",
+    "storage_bucket": "fumiliber-e55e6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:48822261297:android:252fe549fb7767f5212710",
+        "android_client_info": {
+          "package_name": "com.fumiliber.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCjcBLTeK9cqM92hdi5TbkadkMYzpIwySI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
